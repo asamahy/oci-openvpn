@@ -115,3 +115,39 @@ sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules enabled" || printf "%s\n" "Failed to enable Firewall rules"
 
 printf "%s\n" "Provisioning completed"
+############################################
+## OCI-CLI Installation and Configuration ##
+###########################################
+# install oci-cli
+printf "%s\n" "Installing OCI CLI"
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+# exec -l $SHELL
+oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
+
+## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
+## Download the Private Key and Public Key
+## Open the Private Key in a text editor and copy the contents then paste it here
+mkdir -p .oci/sessions/DEFAULT
+cat <<EOF > .oci/sessions/DEFAULT/oci_api_key.pem
+-----BEGIN PRIVATE KEY-----
+# paste the private key here
+-----END PRIVATE KEY-----
+OCI_API_KEY
+EOF
+
+## After saving the private key, click Add and a new window will open with the configuration file content
+## fill in the fields below with those info
+## The values must not include any "" or '' characters.
+## note: the user, fingerprint, tenancy, and region can be found in the OCI web UI under the user profile in case you dismissed the window
+## note 2: leave the key_file as is unless you changed the path of the private key
+cat <<EOF > .oci/config
+[DEFAULT]
+user=<>
+fingerprint=<>
+tenancy=<>
+region=<>
+key_file=.oci/sessions/DEFAULT/oci_api_key.pem
+EOF
+
+chmod 600 .oci/sessions/DEFAULT/oci_api_key.pem
+chmod 600 .oci/config
