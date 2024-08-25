@@ -151,3 +151,60 @@ EOF
 
 chmod 600 .oci/sessions/DEFAULT/oci_api_key.pem
 chmod 600 .oci/config
+
+###############################################
+## Assign IPv6 Address to VNIC using OCI-CLI ##
+###############################################
+
+# add ipv6 cidr to vcn
+function add-ipv6-cidr-block(){
+    printf "%s\n" "Adding IPv6 CIDR Block"
+    oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
+};
+
+# loop to check that all ipv6 addresses are assigned successfully
+function check-ipv6-ips(){
+    VNIC_ID=$1
+    i=$2
+    Assigned_IPv6=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"ipv6-addresses\" | [ $((i-1)) ]");
+    if [[ ${Assigned_IPv6##*:} == $(printf "%x\n" $i) ]]; then
+    printf "%s\n" "IPv6 Address $Assigned_IPv6 Has Been Assigned Successfully"
+    sleep 3 # so we don't hit any rate limit
+    else
+    printf "%s\n" "IPv6 Address $Assigned_IPv6 Has Not Been Assigned"
+    sleep 3 # so we don't hit any rate limit
+    fi
+}
+# assign ipv6 address to the vnic
+function assign-ipv6-address-range(){
+for i in {1..15}; do
+IPv6="${IPv6PREFIX}::1:$(printf "%x\n" $i)";
+oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
+sleep 3 # so we don't hit any rate limit
+check-ipv6-ips "$1" "$i"
+done
+};
+
+COMPARTMENT_ID=$(oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
+--include-root --raw-output --query "data[?contains(\"id\",'tenancy')].id | [0]");
+INSTANCE_ID=$(oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
+--raw-output --query "data[?contains(\"id\",'instance')].id | [0]");
+VNIC_ID=$(oci compute instance list-vnics --instance-id "$INSTANCE_ID" \
+--raw-output --query "data[?contains(\"id\",'vnic')].id | [0]");
+SUBNET_ID=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");
+VCN_ID=$(oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
+IPv6PREFIX=$(oci network vcn get --vcn-id "$VCN_ID" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]");
+
+# if ipv6prefix is empty, then add a new ipv6 cidr block
+if [[ -z "${IPv6PREFIX}" ]]; then
+    printf "%s\n" "IPv6 CIDR Block does not exist"
+    add-ipv6-cidr-block "$VCN_ID"
+    printf "%s\n" "Assigning IPv6 addresses to the VNIC"
+    assign-ipv6-address-range "$VNIC_ID"
+    else
+    printf "%s\n" "IPv6 CIDR Block already exists"
+    printf "%s\n" "Assigning IPv6 addresses to the VNIC"
+    assign-ipv6-address-range "$VNIC_ID"
+fi
+printf "%s\n" "IPv6 Addresses Assigned Successfully."
