@@ -208,14 +208,26 @@ function assign-ipv6-to-subnet(){
     printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
 };
 
+# -------------------------------------------
+# Main Script
+# -------------------------------------------
+
+# if IPv6PREFIX is empty, then add a new ipv6 cidr block, assign to subnet, and then assign addresses to the vnic
 if [[ -z "${IPv6PREFIX}" ]]; then
     printf "%s\n" "IPv6 CIDR Block does not exist"
     add-ipv6-cidr-block "$VCN_ID"
-    printf "%s\n" "Assigning IPv6 addresses to the VNIC"
+    assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")"
     assign-ipv6-address-range "$VNIC_ID"
     else
     printf "%s\n" "IPv6 CIDR Block already exists"
-    printf "%s\n" "Assigning IPv6 addresses to the VNIC"
-    assign-ipv6-address-range "$VNIC_ID"
+    echo "checking if the IPv6 CIDR Block is assigned to the subnet"
+    if [ -z "$(check-ipv6-subnet "$SUBNET_ID")" ]; then
+        assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")" && \
+        assign-ipv6-address-range "$VNIC_ID";
+    else
+        printf "%s\n" "IPv6 CIDR Block Already Assigned to the Subnet"
+        printf "%s\n" "Assigning IPv6 addresses to the VNIC"
+        assign-ipv6-address-range "$VNIC_ID";
+    fi
 fi
 printf "%s\n" "IPv6 Addresses Assigned Successfully."
