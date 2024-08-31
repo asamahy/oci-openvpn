@@ -166,7 +166,11 @@ SUBNET_ID=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data
 VCN_ID=$(oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
 IPv6PREFIX="";
 ROUTE_TABLE_ID=$(oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
-INTERNET_GATEWAY_ID=$(oci network internet-gateway list --compartment-id $COMPARTMENT_ID --vcn-id $VCN_ID --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
+INTERNET_GATEWAY_ID=$(oci network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
+SECURITY_LIST_ID=$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
+CURRENT_INGRESS_RULES="$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
+CURRENT_EGRESS_RULES="$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
+
 
 # get ipv6 cidr block from vcn
 function get-ipv6-prefix(){
@@ -237,6 +241,110 @@ function add-ipv4-ipv6-internet-route(){
 }]" --force > /dev/null 2>&1 && \
     printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
 };
+# get current egress security list rules
+# oci network security-list list --compartment-id $COMPARTMENT_ID --vcn-id $VCN_ID --raw-output --query "data[].\"egress-security-rules\" | [0]";
+
+# update egress security list rules
+function update-egress-security-list(){
+    printf "%s\n" "Updating Egress Security List Rules"
+    oci network security-list update --security-list-id "$1" --egress-security-rules "${2%\]*},{
+        \"description\": null,
+        \"destination\": \"::/0\",
+        \"destination-type\": \"CIDR_BLOCK\",
+        \"icmp-options\": null,
+        \"is-stateless\": false,
+        \"protocol\": \"all\",
+        \"tcp-options\": null,
+        \"udp-options\": null
+    }]" --force > /dev/null 2>&1 && \
+    printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
+};
+
+# update ingress security list rules
+function update-ingress-security-list(){
+    printf "%s\n" "Updating Ingress Security List Rules"
+    oci network security-list update --security-list-id "$1" --ingress-security-rules "${2%\]*},{
+        \"description\": \"Tailscale IPv4 Direct Connection\",
+        \"icmp-options\": null,
+        \"is-stateless\": true,
+        \"protocol\": \"17\",
+        \"source\": \"0.0.0.0/0\",
+        \"source-type\": \"CIDR_BLOCK\",
+        \"tcp-options\": null,
+        \"udp-options\": {
+        \"destination-port-range\": {
+            \"max\": 41641,
+            \"min\": 41641
+        },
+        \"source-port-range\": null
+        }},
+        {
+        \"description\": \"Webmin Port\",
+        \"icmp-options\": null,
+        \"is-stateless\": false,
+        \"protocol\": \"6\",
+        \"source\": \"0.0.0.0/0\",
+        \"source-type\": \"CIDR_BLOCK\",
+        \"tcp-options\": {
+        \"destination-port-range\": {
+            \"max\": 10000,
+            \"min\": 10000
+        },
+        \"source-port-range\": null
+        },
+        \"udp-options\": null
+        },
+        {
+        \"description\": \"OpenVPN IPv4 UDP Port\",
+        \"icmp-options\": null,
+        \"is-stateless\": false,
+        \"protocol\": \"6\",
+        \"source\": \"0.0.0.0/0\",
+        \"source-type\": \"CIDR_BLOCK\",
+        \"tcp-options\": {
+        \"destination-port-range\": {
+            \"max\": 1194,
+            \"min\": 1194
+        },
+        \"source-port-range\": null
+        },
+        \"udp-options\": null
+        },
+        {
+        \"description\": \"OpenVPN IPv6 UDP Port\",
+        \"icmp-options\": null,
+        \"is-stateless\": false,
+        \"protocol\": \"6\",
+        \"source\": \"::/0\",
+        \"source-type\": \"CIDR_BLOCK\",
+        \"tcp-options\": {
+        \"destination-port-range\": {
+            \"max\": 1194,
+            \"min\": 1194
+        },
+        \"source-port-range\": null
+        },
+        \"udp-options\": null
+        },
+        {
+        \"description\": \"Temp Netcat TCP Port\",
+        \"icmp-options\": null,
+        \"is-stateless\": false,
+        \"protocol\": \"6\",
+        \"source\": \"::/0\",
+        \"source-type\": \"CIDR_BLOCK\",
+        \"tcp-options\": {
+        \"destination-port-range\": {
+            \"max\": 17486,
+            \"min\": 17486
+        },
+        \"source-port-range\": null
+        },
+        \"udp-options\": null
+    }]" --force > /dev/null 2>&1 && \
+    printf "%s\n" "Ingress Security List Rules Updated" || printf "%s\n" "Failed to Update Ingress Security List Rules";
+};
+
 
 # -------------------------------------------
 # Main Script
@@ -265,3 +373,9 @@ printf "%s\n" "IPv6 Addresses Assigned Successfully."
 
 # add ipv4 and ipv6 internet routes
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
+
+# update egress security list rules
+update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
+
+# update ingress security list rules
+update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
