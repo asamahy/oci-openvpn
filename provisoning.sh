@@ -196,7 +196,7 @@ function assign-ipv6-address-range(){
     printf "%s\n" "Assigning IPv6 addresses to the VNIC"
     for i in {1..15}; do
     IPv6="${IPv6PREFIX%/*}1:$(printf "%x\n" $i)";
-    oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry;
+    oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
     done
