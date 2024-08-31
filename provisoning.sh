@@ -195,8 +195,19 @@ VNIC_ID=$(oci compute instance list-vnics --instance-id "$INSTANCE_ID" \
 SUBNET_ID=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");
 VCN_ID=$(oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
 IPv6PREFIX=$(oci network vcn get --vcn-id "$VCN_ID" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]");
+# check if ipv6 address is assigned to the subnet
+function check-ipv6-subnet(){
+    oci network subnet get --subnet-id "$1" --raw-output --query "data.\"ipv6-cidr-block\""
+};
 
 # if ipv6prefix is empty, then add a new ipv6 cidr block
+# assign ipv6 to subnet
+function assign-ipv6-to-subnet(){
+    printf "%s\n" "Assigning IPv6 CIDR Block to the Subnet"
+    oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" && \
+    printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
+};
+
 if [[ -z "${IPv6PREFIX}" ]]; then
     printf "%s\n" "IPv6 CIDR Block does not exist"
     add-ipv6-cidr-block "$VCN_ID"
