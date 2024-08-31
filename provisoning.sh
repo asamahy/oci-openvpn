@@ -165,6 +165,8 @@ VNIC_ID=$(oci compute instance list-vnics --instance-id "$INSTANCE_ID" \
 SUBNET_ID=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");
 VCN_ID=$(oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
 IPv6PREFIX="";
+ROUTE_TABLE_ID=$(oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
+INTERNET_GATEWAY_ID=$(oci network internet-gateway list --compartment-id $COMPARTMENT_ID --vcn-id $VCN_ID --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
 
 # get ipv6 cidr block from vcn
 function get-ipv6-prefix(){
@@ -214,6 +216,28 @@ function assign-ipv6-to-subnet(){
     printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
 };
 
+# add ipv4 and ipv6 internet routes
+function add-ipv4-ipv6-internet-route(){
+    printf "%s\n" "Adding IPv4 and IPv6 Internet Routes";
+    oci network route-table update --rt-id "$1" --route-rules "[{
+        \"cidr-block\": null,
+        \"description\": \"IPv4 Internet\",
+        \"destination\": \"0.0.0.0/0\",
+        \"destination-type\": \"CIDR_BLOCK\",
+        \"network-entity-id\": \"$2\",
+        \"route-type\": \"STATIC\"
+        },
+        {
+        \"cidr-block\": null,
+        \"description\": \"IPv6 Internet\",
+        \"destination\": \"::/0\",
+        \"destination-type\": \"CIDR_BLOCK\",
+        \"network-entity-id\": \"$2\",
+        \"route-type\": \"STATIC\"
+}]" --force > /dev/null 2>&1 && \
+    printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
+};
+
 # -------------------------------------------
 # Main Script
 # -------------------------------------------
@@ -238,3 +262,6 @@ if [[ -z "${IPv6PREFIX}" ]]; then
     fi
 fi
 printf "%s\n" "IPv6 Addresses Assigned Successfully."
+
+# add ipv4 and ipv6 internet routes
+add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
