@@ -69,9 +69,10 @@ printf "%s\n" "Successfully Modified Webmin openssl.cnf" || printf "%s\n" "Faile
 
 # install openvpn webmin module
 printf "%s\n" "Installing OpenVPN Webmin Module"
-curl -L https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz -O /tmp/openvpn.wbm.gz
+curl -L -o /tmp/openvpn.wbm.gz https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
 /usr/share/webmin/install-module.pl /tmp/openvpn.wbm.gz && \
 printf "%s\n" "OpenVPN Webmin Module Installed" || printf "%s\n" "Failed to Install OpenVPN Webmin Module"
+
 # edit webmin openvpn-ssl.cnf
 sed -i \
 -e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' /usr/share/webmin/openvpn/openvpn-ssl.cnf && \
@@ -126,9 +127,11 @@ printf "%s\n" "Provisioning completed"
 ###########################################
 # install oci-cli
 printf "%s\n" "Installing OCI CLI"
-bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh) >> /tmp/install.sh" -- --accept-all-defaults
+curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/install.sh && \
+bash /tmp/install.sh --accept-all-defaults > /dev/null 2>&1
 # exec -l $SHELL
 oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
+
 
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
 ## Download the Private Key and Public Key
