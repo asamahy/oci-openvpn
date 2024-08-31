@@ -44,9 +44,9 @@ printf "%s\n" "Successfully Modified openssl.cnf" || printf "%s\n" "Failed to Mo
 
 # install webmin
 printf "%s\n" "Installing Webmin"
-curl -o setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
-chmod +x setup-repos.sh
-sh setup-repos.sh --force && \
+curl -o /tmp/setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
+chmod +x /tmp/setup-repos.sh
+sh /tmp/setup-repos.sh --force && \
 printf "%s\n" "Webmin Repositories Installed" || printf "%s\n" "Failed to Install Webmin Repositories"
 apt-get install webmin --install-recommends -y && \
 printf "%s\n" "Webmin Installed" || printf "%s\n" "Failed to Install Webmin"
@@ -63,8 +63,8 @@ printf "%s\n" "Successfully Modified Webmin openssl.cnf" || printf "%s\n" "Faile
 
 # install openvpn webmin module
 printf "%s\n" "Installing OpenVPN Webmin Module"
-curl -LO https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
-/usr/share/webmin/install-module.pl openvpn.wbm.gz && \
+curl -L https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz -O /tmp/openvpn.wbm.gz
+/usr/share/webmin/install-module.pl /tmp/openvpn.wbm.gz && \
 printf "%s\n" "OpenVPN Webmin Module Installed" || printf "%s\n" "Failed to Install OpenVPN Webmin Module"
 # edit webmin openvpn-ssl.cnf
 sed -i \
@@ -120,15 +120,15 @@ printf "%s\n" "Provisioning completed"
 ###########################################
 # install oci-cli
 printf "%s\n" "Installing OCI CLI"
-bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh) >> /tmp/install.sh" -- --accept-all-defaults
 # exec -l $SHELL
 oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
 
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
 ## Download the Private Key and Public Key
 ## Open the Private Key in a text editor and copy the contents then paste it here
-mkdir -p .oci/sessions/DEFAULT
-cat <<EOF > .oci/sessions/DEFAULT/oci_api_key.pem
+mkdir -p /root/.oci/sessions/DEFAULT
+cat <<EOF > /root/.oci/sessions/DEFAULT/oci_api_key.pem
 -----BEGIN PRIVATE KEY-----
 # paste the private key here
 -----END PRIVATE KEY-----
@@ -140,22 +140,22 @@ EOF
 ## The values must not include any "" or '' characters.
 ## note: the user, fingerprint, tenancy, and region can be found in the OCI web UI under the user profile in case you dismissed the window
 ## note 2: leave the key_file as is unless you changed the path of the private key
-cat <<EOF > .oci/config
+cat <<EOF > /root/.oci/config
 [DEFAULT]
 user=<>
 fingerprint=<>
 tenancy=<>
 region=<>
-key_file=.oci/sessions/DEFAULT/oci_api_key.pem
+key_file=/root/.oci/sessions/DEFAULT/oci_api_key.pem
 EOF
 
-chmod 600 .oci/sessions/DEFAULT/oci_api_key.pem
-chmod 600 .oci/config
+chmod 600 /root/.oci/sessions/DEFAULT/oci_api_key.pem
+chmod 600 /root/.oci/config
 
 ###############################################
 ## Assign IPv6 Address to VNIC using OCI-CLI ##
 ###############################################
-
+INSTANCE_NAME="CHANGE_ME"
 # add ipv6 cidr to vcn
 function add-ipv6-cidr-block(){
     printf "%s\n" "Adding IPv6 CIDR Block"
