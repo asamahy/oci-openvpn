@@ -14,14 +14,20 @@
 ##
 ##
 # update the repos and upgrade the system
+printf "%s\n" "****************************************"
+printf "%s\n" "Provisioning Script for Ubuntu 22.04 LTS"
+printf "%s\n\n" "****************************************"
+printf "%s\n" "Updating System"
 apt-get update && apt-get upgrade -y && \
 printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
 
 # install tools
+printf "%s\n" "Installing Tools"
 apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \
 printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
 
 # generate random seed for openssl and write to /root/.rnd
+printf "%s\n" "Generating Random Seed for OpenSSL"
 openssl rand -writerand /root/.rnd -out /dev/null && \
 printf "%s\n" "Random Seed Generated" || printf "%s\n" "Failed to Generate Random Seed"
 
@@ -205,7 +211,8 @@ function assign-ipv6-address-range(){
     oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
-    done
+    done && \
+    printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
 };
 
 # check if ipv6 address is assigned to the subnet
@@ -369,7 +376,6 @@ if [[ -z "${IPv6PREFIX}" ]]; then
         assign-ipv6-address-range "$VNIC_ID";
     fi
 fi
-printf "%s\n" "IPv6 Addresses Assigned Successfully."
 
 # add ipv4 and ipv6 internet routes
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
