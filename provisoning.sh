@@ -26,13 +26,15 @@ printf "%s\n\n" "****************************************"
 printf "%s\n" "Updating System"
 apt-get update && apt-get upgrade -y && \
 printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
+
 # install tools
 printf "%s\n" "Installing Tools"
 apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \
 printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
 
 # generate random seed for openssl and write to /root/.rnd
-printf "%s\n" "Generating Random Seed for OpenSSL"openssl rand -writerand /root/.rnd -out /dev/null && \
+printf "%s\n" "Generating Random Seed for OpenSSL"
+openssl rand -writerand /root/.rnd -out /dev/null && \
 printf "%s\n" "Random Seed Generated" || printf "%s\n" "Failed to Generate Random Seed"
 
 # enable ip forwarding for ipv4 and ipv6
@@ -140,6 +142,7 @@ oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n"
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
 ## Download the Private Key and Public Key
 ## Open the Private Key in a text editor and copy the contents then paste it here
+
 mkdir -p /root/.oci/sessions/DEFAULT
 cat <<EOF > /root/.oci/sessions/DEFAULT/oci_api_key.pem
 -----BEGIN PRIVATE KEY-----
@@ -252,7 +255,7 @@ function add-ipv4-ipv6-internet-route(){
         \"destination-type\": \"CIDR_BLOCK\",
         \"network-entity-id\": \"$2\",
         \"route-type\": \"STATIC\"
-}]" --force > /dev/null 2>&1 && \
+    }]" --force > /dev/null 2>&1 && \
     printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
 };
 # get current egress security list rules
