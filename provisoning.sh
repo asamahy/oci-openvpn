@@ -13,6 +13,7 @@
 ## 
 ##
 ##
+INSTANCE_NAME="CHANGE_ME";
 function cleanup(){
 printf "%s\n" "Cleaning up temporary files..."
 rm -f openvpn.wbm.gz
