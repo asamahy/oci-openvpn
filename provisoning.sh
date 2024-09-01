@@ -56,17 +56,14 @@ printf "%s\n" "Successfully Modified openssl.cnf" || printf "%s\n" "Failed to Mo
 
 # install webmin
 printf "%s\n" "Installing Webmin"
-curl -o /tmp/setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
-chmod +x /tmp/setup-repos.sh
-sh /tmp/setup-repos.sh --force && \
+bash -c "$(curl -L  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force && \
 printf "%s\n" "Webmin Repositories Installed" || printf "%s\n" "Failed to Install Webmin Repositories"
 apt-get install webmin --install-recommends -y && \
 printf "%s\n" "Webmin Installed" || printf "%s\n" "Failed to Install Webmin"
 
 sleep 2
 
-# edit webmin openssl.cnf
-printf "%s\n" "Changing default_days, default_crl_days, and default_md in /usr/share/webmin/acl/openssl.cnf"
+# edit webmin openssl.cnfprintf "%s\n" "Changing default_days, default_crl_days, and default_md in /usr/share/webmin/acl/openssl.cnf"
 sudo sed -i \
 -e 's/^\(default_days\s*=\s*\)[^#[:space:]]*/\13650/' \
 -e 's/^\(default_crl_days\s*=\s*\)[^#[:space:]]*/\13650/' \
@@ -75,8 +72,8 @@ printf "%s\n" "Successfully Modified Webmin openssl.cnf" || printf "%s\n" "Faile
 
 # install openvpn webmin module
 printf "%s\n" "Installing OpenVPN Webmin Module"
-curl -L -o /tmp/openvpn.wbm.gz https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
-/usr/share/webmin/install-module.pl /tmp/openvpn.wbm.gz && \
+curl -L -o openvpn.wbm.gz https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
+/usr/share/webmin/install-module.pl openvpn.wbm.gz && \
 printf "%s\n" "OpenVPN Webmin Module Installed" || printf "%s\n" "Failed to Install OpenVPN Webmin Module"
 
 # edit webmin openvpn-ssl.cnf
@@ -90,8 +87,7 @@ printf "%s\n" "Adding rules to /etc/iptables/rules.v4"
 rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 
 # inserting firewall rules
-# webmin port 10000
-printf "%s\n" "Adding Webmin rule"
+# webmin port 10000printf "%s\n" "Adding Webmin rule"
 iptables -I INPUT $((++ rule_number)) -p tcp -m state -m tcp --dport 10000 --state NEW -j ACCEPT && \
 printf "%s\n" "Webmin rule added" || printf "%s\n" "Failed to add Webmin rule"
 
