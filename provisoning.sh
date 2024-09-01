@@ -133,11 +133,8 @@ printf "%s\n" "Provisioning completed"
 ###########################################
 # install oci-cli
 printf "%s\n" "Installing OCI CLI"
-curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/install.sh && \
-bash /tmp/install.sh --accept-all-defaults > /dev/null 2>&1
-# exec -l $SHELL
-oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
-
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+/root/bin/oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
 
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
 ## Download the Private Key and Public Key
@@ -172,30 +169,28 @@ chmod 600 /root/.oci/config
 ## Assign IPv6 Address to VNIC using OCI-CLI ##
 ###############################################
 INSTANCE_NAME="CHANGE_ME"
-COMPARTMENT_ID=$(oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
+COMPARTMENT_ID=$(/root/bin/oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
 --include-root --raw-output --query "data[?contains(\"id\",'tenancy')].id | [0]");
-INSTANCE_ID=$(oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
+INSTANCE_ID=$(/root/bin/oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
 --raw-output --query "data[?contains(\"id\",'instance')].id | [0]");
-VNIC_ID=$(oci compute instance list-vnics --instance-id "$INSTANCE_ID" \
+VNIC_ID=$(/root/bin/oci compute instance list-vnics --instance-id "$INSTANCE_ID" \
 --raw-output --query "data[?contains(\"id\",'vnic')].id | [0]");
-SUBNET_ID=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");
-VCN_ID=$(oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
+SUBNET_ID=$(/root/bin/oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");VCN_ID=$(/root/bin/oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
 IPv6PREFIX="";
-ROUTE_TABLE_ID=$(oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
-INTERNET_GATEWAY_ID=$(oci network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
-SECURITY_LIST_ID=$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
-CURRENT_INGRESS_RULES="$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
-CURRENT_EGRESS_RULES="$(oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
+ROUTE_TABLE_ID=$(/root/bin/oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
+INTERNET_GATEWAY_ID=$(/root/bin/oci network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
+SECURITY_LIST_ID=$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
+CURRENT_INGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
+CURRENT_EGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
 
 
 # get ipv6 cidr block from vcn
 function get-ipv6-prefix(){
-    oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
+    /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
 };
 # add ipv6 cidr block to vcn
 function add-ipv6-cidr-block(){
-    printf "%s\n" "Adding IPv6 CIDR Block"
-    oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    printf "%s\n" "Adding IPv6 CIDR Block"    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
 
@@ -203,7 +198,7 @@ function add-ipv6-cidr-block(){
 function check-ipv6-ips(){
     VNIC_ID=$1
     i=$2
-    Assigned_IPv6=$(oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"ipv6-addresses\" | [ $((i-1)) ]");
+    Assigned_IPv6=$(/root/bin/oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"ipv6-addresses\" | [ $((i-1)) ]");
     if [[ ${Assigned_IPv6##*:} == $(printf "%x\n" $i) ]]; then
     printf "%s\n" "IPv6 Address $Assigned_IPv6 Has Been Assigned Successfully"
     sleep 3 # so we don't hit any rate limit
@@ -218,7 +213,7 @@ function assign-ipv6-address-range(){
     printf "%s\n" "Assigning IPv6 addresses to the VNIC"
     for i in {1..15}; do
     IPv6="${IPv6PREFIX%/*}1:$(printf "%x\n" $i)";
-    oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
+    /root/bin/oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
     done && \
@@ -227,28 +222,27 @@ function assign-ipv6-address-range(){
 
 # check if ipv6 address is assigned to the subnet
 function check-ipv6-subnet(){
-    oci network subnet get --subnet-id "$1" --raw-output --query "data.\"ipv6-cidr-block\""
+    /root/bin/oci network subnet get --subnet-id "$1" --raw-output --query "data.\"ipv6-cidr-block\""
 };
 
 # assign ipv6 to subnet
 function assign-ipv6-to-subnet(){
     printf "%s\n" "Assigning IPv6 CIDR Block to the Subnet"
-    oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" && \
+    /root/bin/oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" && \
     printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
 };
 
 # add ipv4 and ipv6 internet routes
 function add-ipv4-ipv6-internet-route(){
     printf "%s\n" "Adding IPv4 and IPv6 Internet Routes";
-    oci network route-table update --rt-id "$1" --route-rules "[{
+    /root/bin/oci network route-table update --rt-id "$1" --route-rules "[{
         \"cidr-block\": null,
         \"description\": \"IPv4 Internet\",
         \"destination\": \"0.0.0.0/0\",
         \"destination-type\": \"CIDR_BLOCK\",
         \"network-entity-id\": \"$2\",
         \"route-type\": \"STATIC\"
-        },
-        {
+        },        {
         \"cidr-block\": null,
         \"description\": \"IPv6 Internet\",
         \"destination\": \"::/0\",
@@ -264,15 +258,14 @@ function add-ipv4-ipv6-internet-route(){
 # update egress security list rules
 function update-egress-security-list(){
     printf "%s\n" "Updating Egress Security List Rules"
-    oci network security-list update --security-list-id "$1" --egress-security-rules "${2%\]*},{
+    /root/bin/oci network security-list update --security-list-id "$1" --egress-security-rules "${2%\]*},{
         \"description\": null,
         \"destination\": \"::/0\",
         \"destination-type\": \"CIDR_BLOCK\",
         \"icmp-options\": null,
         \"is-stateless\": false,
         \"protocol\": \"all\",
-        \"tcp-options\": null,
-        \"udp-options\": null
+        \"tcp-options\": null,        \"udp-options\": null
     }]" --force > /dev/null 2>&1 && \
     printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
 };
@@ -280,15 +273,14 @@ function update-egress-security-list(){
 # update ingress security list rules
 function update-ingress-security-list(){
     printf "%s\n" "Updating Ingress Security List Rules"
-    oci network security-list update --security-list-id "$1" --ingress-security-rules "${2%\]*},{
+    /root/bin/oci network security-list update --security-list-id "$1" --ingress-security-rules "${2%\]*},{
         \"description\": \"Tailscale IPv4 Direct Connection\",
         \"icmp-options\": null,
         \"is-stateless\": true,
         \"protocol\": \"17\",
         \"source\": \"0.0.0.0/0\",
         \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": null,
-        \"udp-options\": {
+        \"tcp-options\": null,        \"udp-options\": {
         \"destination-port-range\": {
             \"max\": 41641,
             \"min\": 41641
