@@ -312,7 +312,7 @@ function update-ingress-security-list(){
         \"description\": \"OpenVPN IPv4 UDP Port\",
         \"icmp-options\": null,
         \"is-stateless\": false,
-        \"protocol\": \"6\",
+        \"protocol\": \"17\",
         \"source\": \"0.0.0.0/0\",
         \"source-type\": \"CIDR_BLOCK\",
         \"tcp-options\": {
@@ -328,7 +328,7 @@ function update-ingress-security-list(){
         \"description\": \"OpenVPN IPv6 UDP Port\",
         \"icmp-options\": null,
         \"is-stateless\": false,
-        \"protocol\": \"6\",
+        \"protocol\": \"17\",
         \"source\": \"::/0\",
         \"source-type\": \"CIDR_BLOCK\",
         \"tcp-options\": {
