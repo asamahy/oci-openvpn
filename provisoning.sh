@@ -13,6 +13,12 @@
 ## 
 ##
 ##
+function cleanup(){
+printf "%s\n" "Cleaning up temporary files..."
+rm -f openvpn.wbm.gz
+exit 0
+};
+
 # update the repos and upgrade the system
 printf "%s\n" "****************************************"
 printf "%s\n" "Provisioning Script for Ubuntu 22.04 LTS"
@@ -20,15 +26,13 @@ printf "%s\n\n" "****************************************"
 printf "%s\n" "Updating System"
 apt-get update && apt-get upgrade -y && \
 printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
-
 # install tools
 printf "%s\n" "Installing Tools"
 apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \
 printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
 
 # generate random seed for openssl and write to /root/.rnd
-printf "%s\n" "Generating Random Seed for OpenSSL"
-openssl rand -writerand /root/.rnd -out /dev/null && \
+printf "%s\n" "Generating Random Seed for OpenSSL"openssl rand -writerand /root/.rnd -out /dev/null && \
 printf "%s\n" "Random Seed Generated" || printf "%s\n" "Failed to Generate Random Seed"
 
 # enable ip forwarding for ipv4 and ipv6
@@ -388,3 +392,4 @@ update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
 
 # update ingress security list rules
 update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
+cleanup
