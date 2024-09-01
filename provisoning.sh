@@ -350,6 +350,16 @@ function update-ingress-security-list(){
     printf "%s\n" "Ingress Security List Rules Updated" || printf "%s\n" "Failed to Update Ingress Security List Rules";
 };
 
+function check-and-assign(){
+    if [ -z "$(check-ipv6-subnet "$SUBNET_ID")" ]; then
+        assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")" && \
+        sleep 5 && \
+        assign-ipv6-address-range "$VNIC_ID";
+    else
+        printf "%s\n" "IPv6 CIDR Block Already Assigned to the Subnet"
+        assign-ipv6-address-range "$VNIC_ID";
+    fi
+}
 
 # -------------------------------------------
 # Main Script
@@ -360,19 +370,12 @@ IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID")
 if [[ -z "${IPv6PREFIX}" ]]; then
     printf "%s\n" "IPv6 CIDR Block does not exist"
     add-ipv6-cidr-block "$VCN_ID"
-    assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")"
-    assign-ipv6-address-range "$VNIC_ID"
+    sleep 5
+    check-and-assign
     else
     printf "%s\n" "IPv6 CIDR Block already exists"
     echo "checking if the IPv6 CIDR Block is assigned to the subnet"
-    if [ -z "$(check-ipv6-subnet "$SUBNET_ID")" ]; then
-        assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")" && \
-        assign-ipv6-address-range "$VNIC_ID";
-    else
-        printf "%s\n" "IPv6 CIDR Block Already Assigned to the Subnet"
-        printf "%s\n" "Assigning IPv6 addresses to the VNIC"
-        assign-ipv6-address-range "$VNIC_ID";
-    fi
+    check-and-assign
 fi
 
 # add ipv4 and ipv6 internet routes
