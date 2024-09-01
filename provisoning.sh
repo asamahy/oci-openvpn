@@ -386,4 +386,9 @@ update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
 
 # update ingress security list rules
 update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
+
+dhclient -6 && printf "%s\n" "IPv6 Address Assigned Successfully to VNIC" || printf "%s\n" "Failed to Assign IPv6 Address to VNIC"
+ping6 -c 3 google.com && printf "%s\n" "IPv6 Connectivity Established" || printf "%s\n" "Failed to Establish IPv6 Connectivity"
+fi
+
 cleanup
