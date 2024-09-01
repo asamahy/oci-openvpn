@@ -206,14 +206,14 @@ function check-ipv6-ips(){
 
 # assign ipv6 address to the vnic
 function assign-ipv6-address-range(){
+    IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID");
     printf "%s\n" "Assigning IPv6 addresses to the VNIC"
     for i in {1..15}; do
     IPv6="${IPv6PREFIX%/*}1:$(printf "%x\n" $i)";
     /root/bin/oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
-    done && \
-    printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
+    done && \    printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
 };
 
 # check if ipv6 address is assigned to the subnet
