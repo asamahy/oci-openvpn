@@ -63,7 +63,8 @@ printf "%s\n" "Webmin Installed" || printf "%s\n" "Failed to Install Webmin"
 
 sleep 2
 
-# edit webmin openssl.cnfprintf "%s\n" "Changing default_days, default_crl_days, and default_md in /usr/share/webmin/acl/openssl.cnf"
+# edit webmin openssl.cnf
+printf "%s\n" "Changing default_days, default_crl_days, and default_md in /usr/share/webmin/acl/openssl.cnf"
 sudo sed -i \
 -e 's/^\(default_days\s*=\s*\)[^#[:space:]]*/\13650/' \
 -e 's/^\(default_crl_days\s*=\s*\)[^#[:space:]]*/\13650/' \
@@ -87,7 +88,8 @@ printf "%s\n" "Adding rules to /etc/iptables/rules.v4"
 rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 
 # inserting firewall rules
-# webmin port 10000printf "%s\n" "Adding Webmin rule"
+# webmin port 10000
+printf "%s\n" "Adding Webmin rule"
 iptables -I INPUT $((++ rule_number)) -p tcp -m state -m tcp --dport 10000 --state NEW -j ACCEPT && \
 printf "%s\n" "Webmin rule added" || printf "%s\n" "Failed to add Webmin rule"
 
@@ -164,7 +166,9 @@ chmod 600 /root/.oci/config
 ###############################################
 ## Assign IPv6 Address to VNIC using OCI-CLI ##
 ###############################################
-INSTANCE_NAME="CHANGE_ME"
+if [ "$(command -v /root/bin/oci)" ]; then
+printf "%s\n" "OCI CLI is Found"
+printf "%s\n" "Initializing OCI CLI Environment Variables"
 COMPARTMENT_ID=$(/root/bin/oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
 --include-root --raw-output --query "data[?contains(\"id\",'tenancy')].id | [0]");
 INSTANCE_ID=$(/root/bin/oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
@@ -178,15 +182,14 @@ INTERNET_GATEWAY_ID=$(/root/bin/oci network internet-gateway list --compartment-
 SECURITY_LIST_ID=$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
 CURRENT_INGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
 CURRENT_EGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
-
-
 # get ipv6 cidr block from vcn
 function get-ipv6-prefix(){
     /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
 };
 # add ipv6 cidr block to vcn
 function add-ipv6-cidr-block(){
-    printf "%s\n" "Adding IPv6 CIDR Block"    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    printf "%s\n" "Adding IPv6 CIDR Block"
+    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
 
@@ -213,7 +216,8 @@ function assign-ipv6-address-range(){
     /root/bin/oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
-    done && \    printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
+    done && \
+    printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
 };
 
 # check if ipv6 address is assigned to the subnet
@@ -238,7 +242,8 @@ function add-ipv4-ipv6-internet-route(){
         \"destination-type\": \"CIDR_BLOCK\",
         \"network-entity-id\": \"$2\",
         \"route-type\": \"STATIC\"
-        },        {
+        },
+        {
         \"cidr-block\": null,
         \"description\": \"IPv6 Internet\",
         \"destination\": \"::/0\",
@@ -261,7 +266,8 @@ function update-egress-security-list(){
         \"icmp-options\": null,
         \"is-stateless\": false,
         \"protocol\": \"all\",
-        \"tcp-options\": null,        \"udp-options\": null
+        \"tcp-options\": null,
+        \"udp-options\": null
     }]" --force > /dev/null 2>&1 && \
     printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
 };
@@ -276,7 +282,8 @@ function update-ingress-security-list(){
         \"protocol\": \"17\",
         \"source\": \"0.0.0.0/0\",
         \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": null,        \"udp-options\": {
+        \"tcp-options\": null,
+        \"udp-options\": {
         \"destination-port-range\": {
             \"max\": 41641,
             \"min\": 41641
