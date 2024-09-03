@@ -345,7 +345,7 @@ function update-ingress-security-list(){
         \"icmp-options\": null,
         \"is-stateless\": false,
         \"protocol\": \"6\",
-        \"source\": \"::/0\",
+        \"source\": \"0.0.0.0/0\",
         \"source-type\": \"CIDR_BLOCK\",
         \"tcp-options\": {
         \"destination-port-range\": {
