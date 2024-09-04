@@ -252,7 +252,7 @@ function get-ipv6-prefix(){
 # add ipv6 cidr block to vcn
 function add-ipv6-cidr-block(){
     printf "%s\n" "Adding IPv6 CIDR Block"
-    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" > /dev/null && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
 
@@ -276,7 +276,7 @@ function assign-ipv6-address-range(){
     printf "%s\n" "Assigning IPv6 addresses to the VNIC"
     for i in {1..15}; do
     IPv6="${IPv6PREFIX%/*}1:$(printf "%x\n" $i)";
-    /root/bin/oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null 2>&1;
+    /root/bin/oci network vnic assign-ipv6 --vnic-id "$1" --ip-address "$IPv6" --no-retry > /dev/null;
     sleep 3 # so we don't hit any rate limit
     check-ipv6-ips "$1" "$i"
     done && \
@@ -291,7 +291,7 @@ function check-ipv6-subnet(){
 # assign ipv6 to subnet
 function assign-ipv6-to-subnet(){
     printf "%s\n" "Assigning IPv6 CIDR Block to the Subnet"
-    /root/bin/oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" && \
+    /root/bin/oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" > /dev/null && \
     printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
 };
 
@@ -313,7 +313,7 @@ function add-ipv4-ipv6-internet-route(){
         \"destination-type\": \"CIDR_BLOCK\",
         \"network-entity-id\": \"$2\",
         \"route-type\": \"STATIC\"
-    }]" --force > /dev/null 2>&1 && \
+    }]" --force > /dev/null && \
     printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
 };
 # get current egress security list rules
@@ -331,7 +331,7 @@ function update-egress-security-list(){
         \"protocol\": \"all\",
         \"tcp-options\": null,
         \"udp-options\": null
-    }]" --force > /dev/null 2>&1 && \
+    }]" --force > /dev/null && \
     printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
 };
 
@@ -416,7 +416,7 @@ function update-ingress-security-list(){
         \"source-port-range\": null
         },
         \"udp-options\": null
-    }]" --force > /dev/null 2>&1 && \
+    }]" --force > /dev/null && \
     printf "%s\n" "Ingress Security List Rules Updated" || printf "%s\n" "Failed to Update Ingress Security List Rules";
 };
 
@@ -455,7 +455,7 @@ update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
 update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
 
 dhclient -6 && printf "%s\n" "IPv6 Address Assigned Successfully to VNIC" || printf "%s\n" "Failed to Assign IPv6 Address to VNIC"
-ping6 -c 1 google.com > /dev/null 2>&1 && \
+ping6 -c 1 google.com > /dev/null && \
 printf "%s\n" "IPv6 Connectivity Established" || printf "%s\n" "Failed to Establish IPv6 Connectivity"
 fi # oci-cli check
 
@@ -769,32 +769,32 @@ printf "%s\n" "****************************************"
     if [ "$UBUNTU_PASSWORD" == "CHANGE_ME" ]; then
             printf "%s\n" "UBUNTU_PASSWORD is set to the script default, please change it to an actual password"
             echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null && \
-            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+            printf "%s\n" "UBUNTU_PASSWORD is set to for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
         else
             printf "%s\n" "Seting the password for the ubuntu"
             echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null && \
-            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+            printf "%s\n" "UBUNTU_PASSWORD is set to for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
     fi
 
     if [ "$ROOT_PASSWORD" == "CHANGE_ME" ]; then
             printf "%s\n" "ROOT_PASSWORD is set to the script default, please change it to an actual password"
             echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null && \
-            printf "%s\n" "ROOT_PASSWORD is set to $ROOT_PASSWORD" || printf "%s\n" "Failed to set ROOT_PASSWORD"
+            printf "%s\n" "ROOT_PASSWORD is set" || printf "%s\n" "Failed to set ROOT_PASSWORD"
         else
             printf "%s\n" "Seting the password for the root"
             echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null && \
-            printf "%s\n" "ROOT_PASSWORD is set to $ROOT_PASSWORD" || printf "%s\n" "Failed to set ROOT_PASSWORD"
+            printf "%s\n" "ROOT_PASSWORD is set" || printf "%s\n" "Failed to set ROOT_PASSWORD"
     fi
 else
     printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
 fi
+
     touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully (un)changed";
 
 
     #check for all the parts to be completed before rebooting
     if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
-        printf "%s\n" "Rebooting the server to apply the changes"
-        reboot
+        printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
 fi
