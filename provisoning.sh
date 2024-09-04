@@ -14,6 +14,18 @@
 ##
 ##
 INSTANCE_NAME="CHANGE_ME";
+INSTANCE_IPv4="10.0.0.2";
+VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
+DNS_SERVER_1="1.1.1.1"
+DNS_SERVER_2="8.8.8.8"
+VPN_NET_IP="10.50.0.0";
+VPN_NET_MASK="255.255.255.0";
+VPN_CIDR="24";
+VPN_PORT="1194";
+VPN_PROTOCOL="udp";
+VPN_CIPHER="AES-256-CBC";
+HMAC_ALG="SHA512";
+
 function cleanup(){
 printf "%s\n" "Cleaning up temporary files..."
 rm -f openvpn.wbm.gz
@@ -30,8 +42,7 @@ printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
 
 # install tools
 printf "%s\n" "Installing Tools"
-apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \
-printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
+apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
 
 # generate random seed for openssl and write to /root/.rnd
 printf "%s\n" "Generating Random Seed for OpenSSL"
@@ -399,5 +410,282 @@ update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
 dhclient -6 && printf "%s\n" "IPv6 Address Assigned Successfully to VNIC" || printf "%s\n" "Failed to Assign IPv6 Address to VNIC"
 ping6 -c 3 google.com && printf "%s\n" "IPv6 Connectivity Established" || printf "%s\n" "Failed to Establish IPv6 Connectivity"
 fi
+############################################
+## Create The OpenVPN Server Configuration ##
+############################################
+
 
 cleanup
+printf "%s\n" "****************************************"
+printf "%s\n" "Part 4: OpenVPN Server Configuration"
+printf "%s\n" "****************************************"
+
+# OpenVPN Server Setup
+# ----------------------------
+printf "%s\n" "Setting up CA Vars";
+# set the CA Vars:
+export CA_NAME='CloudLabCA'
+export KEY_SIZE='2048'
+export CA_EXPIRE='3650'
+export KEY_CN='CloudLabVPN'
+export KEY_CONFIG='/etc/openvpn/openvpn-ssl.cnf'
+export KEY_DIR='/etc/openvpn/keys'
+export KEY_COUNTRY='FR'
+export KEY_PROVINCE='13'
+export KEY_CITY='Marseille'
+export KEY_ORG='My Org'
+export KEY_EMAIL='me@my.org'
+export KEY_OU='Cloud Lab'
+
+# Creating the CA:
+# ---------------
+# duplicate the openvpn-ssl.cnf file to change the database and serial file path
+printf "%s\n" "creating a modified openvpn-ssl.cnf file"
+cp /usr/share/webmin/openvpn/openvpn-ssl.cnf /etc/openvpn/
+bash -c "sed \
+-e 's/^\(database\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/index.txt/' \
+-e 's/^\(serial\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/serial/' \
+/etc/openvpn/openvpn-ssl.cnf > /etc/openvpn/openvpn-ssl-mod.cnf" > /dev/null && \
+printf "%s\n" "Modified openvpn-ssl.cnf file created" || { printf "%s\n" "Failed to create Modified openvpn-ssl.cnf file" && exit 1; }
+
+# create the CA directory
+mkdir -p ${KEY_DIR}/${CA_NAME} > /dev/null && \
+printf "%s\n" "CA Directory Created" || { printf "%s\n" "Failed to Create CA Directory" && exit 1; }
+
+# ca webmin config:
+# -----------------
+bash -c "cat << EOF > ${KEY_DIR}/${CA_NAME}/ca.config
+\\\$info_ca = {
+CA_NAME=>'${CA_NAME}',
+CA_EXPIRE=>'${CA_EXPIRE}',
+KEY_SIZE=>'${KEY_SIZE}',
+KEY_CONFIG=>'${KEY_CONFIG}',
+KEY_DIR=>'${KEY_DIR}',
+KEY_COUNTRY=>'${KEY_COUNTRY}',
+KEY_PROVINCE=>'${KEY_PROVINCE}',
+KEY_CITY=>'${KEY_CITY}',
+KEY_ORG=>'${KEY_ORG}',
+KEY_EMAIL=>'${KEY_EMAIL}',
+KEY_OU=>'${KEY_OU}',
+KEY_CN=>'${KEY_CN}',
+}
+EOF
+" > /dev/null && \
+printf "%s\n" "CA Webmin Config Created" || { printf "%s\n" "Failed to Create CA Webmin Config" && exit 1; }
+
+# create the Deffie-Hellman key
+printf "%s\n" "Creating the Deffie-Hellman key"
+openssl dhparam -out "${KEY_DIR}/${CA_NAME}/dh${KEY_SIZE}.pem" "$KEY_SIZE" > /dev/null 2>&1 && \
+printf "%s\n" "Deffie-Hellman key created" || { printf "%s\n" "Failed to create Deffie-Hellman key" && exit 1; }
+
+# create the Database and serial files
+printf "%s\n" "Creating the Database and Serial files"
+bash -c "touch "${KEY_DIR}/${CA_NAME}/index.txt"" && \
+printf "%s\n" "Database file created" || { printf "%s\n" "Failed to create Database file" && exit 1; }
+bash -c "echo 01 > "${KEY_DIR}/${CA_NAME}/serial"" && \
+printf "%s\n" "Serial file created" || { printf "%s\n" "Failed to create Serial file" && exit 1; }
+
+# create the CA key and certificate
+printf "%s\n" "Creating the CA key and certificate"
+/usr/bin/openssl req -batch -days 3650 -nodes -new -x509 \
+-keyout "${KEY_DIR}/${CA_NAME}/ca.key" \
+-out "${KEY_DIR}/${CA_NAME}/ca.crt" \
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "CA key and certificate created" || { printf "%s\n" "Failed to create CA key and certificate" && exit 1; }
+
+# create the CRL:
+printf "%s\n" "Creating the CRL"
+/usr/bin/openssl ca -gencrl \
+-keyfile "${KEY_DIR}/${CA_NAME}/ca.key" \
+-cert "${KEY_DIR}/${CA_NAME}/ca.crt" \
+-out "${KEY_DIR}/${CA_NAME}/crl.pem" \
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null && \
+printf "%s\n" "CRL created" || { printf "%s\n" "Failed to create CRL" && exit 1; }
+
+# create the PEM file
+printf "%s\n" "Creating the PEM file"
+bash -c "cat ${KEY_DIR}/${CA_NAME}/ca.crt ${KEY_DIR}/${CA_NAME}/ca.key \
+> ${KEY_DIR}/${CA_NAME}/ca.pem" > /dev/null && \
+printf "%s\n" "PEM file created" || { printf "%s\n" "Failed to create PEM file" && exit 1; }
+
+# Server key:
+# ----------
+export KEY_CN="${KEY_CN}_server" #key common name
+
+# create the server key and certificate
+printf "%s\n" "Creating the server key and certificate"
+openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
+-keyout "$KEY_DIR/${CA_NAME}/${KEY_CN}.key" \
+-out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
+-extensions server \
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Server key and certificate created" || { printf "%s\n" "Failed to create Server key and certificate" && exit 1; }
+
+# sign the server certificate
+printf "%s\n" "Signing the server certificate"
+openssl ca -days 3650 -batch \
+-out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
+-in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
+-keyfile "$KEY_DIR/${CA_NAME}/ca.key" \
+-cert "$KEY_DIR/${CA_NAME}/ca.crt" \
+-extensions server \
+-config /etc/openvpn/openvpn-ssl-mod.cnf && \
+printf "%s\n" "Server certificate signed" || { printf "%s\n" "Failed to sign Server certificate" && exit 1; }
+
+# move pem file from key dir to ca dir
+mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/ > /dev/null && \
+printf "%s\n" "PEM file moved to CA directory" || { printf "%s\n" "Failed to move PEM file to CA directory" && exit 1; }
+
+# create the server key file for webmin
+bash -c "echo -e 'Do not remove this file. It will be used from webmin OpenVPN Administration interface.' \
+> "$KEY_DIR/${CA_NAME}/${KEY_CN}".server" > /dev/null && \
+printf "%s\n" "Server key file created" || { printf "%s\n" "Failed to create Server key file" && exit 1; }
+
+# Client key:
+# ----------
+export KEY_CN="${KEY_CN%_server}_client" #key common name
+
+# create the client key and certificate
+printf "%s\n" "Creating the client key and certificate"
+openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
+-keyout "$KEY_DIR/${CA_NAME}/${KEY_CN}.key" \
+-out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Client key and certificate created" || { printf "%s\n" "Failed to create Client key and certificate" && exit 1; }
+
+# sign the client certificate
+printf "%s\n" "Signing the client certificate"
+openssl ca -days 3650 -batch \
+-out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
+-in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
+-keyfile "$KEY_DIR/${CA_NAME}/ca.key" \
+-cert "$KEY_DIR/${CA_NAME}/ca.crt" \
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null && \
+printf "%s\n" "Client certificate signed" || { printf "%s\n" "Failed to sign Client certificate" && exit 1; }
+
+# move pem file from key dir to ca dir
+mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/ > /dev/null && \
+printf "%s\n" "PEM file moved to CA directory" || { printf "%s\n" "Failed to move PEM file to CA directory" && exit 1; }
+
+# ----------------------
+# creating the server config file:
+# ---------------
+export KEY_CN="${KEY_CN%_client}"
+
+IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID");
+# create the server config file
+printf "%s\n" "Creating the server config file"
+bash -c "cat << EOF > /etc/openvpn/${KEY_CN}.conf
+port ${VPN_PORT}
+proto ${VPN_PROTOCOL}
+dev tun0
+ca keys/${CA_NAME}/ca.crt
+cert keys/${CA_NAME}/${KEY_CN}_server.crt
+key keys/${CA_NAME}/${KEY_CN}_server.key
+dh keys/${CA_NAME}/dh${KEY_SIZE}.pem
+topology subnet
+server ${VPN_NET_IP} ${VPN_NET_MASK}
+crl-verify keys/${CA_NAME}/crl.pem
+ifconfig-pool-persist servers/${KEY_CN}/logs/ipp.txt
+cipher ${VPN_CIPHER}
+user root
+group root
+status servers/${KEY_CN}/logs/openvpn-status.log
+log-append servers/${KEY_CN}/logs/openvpn.log
+verb 2
+mute 20
+max-clients 100
+keepalive 10 120
+client-config-dir /etc/openvpn/servers/${KEY_CN}/ccd
+duplicate-cn
+persist-key
+persist-tun
+float
+ccd-exclusive
+ifconfig-ipv6 ${IPv6PREFIX%/*}1:1/124 ::
+ifconfig-ipv6-pool ${IPv6PREFIX%/*}1:2/124
+auth ${HMAC_ALG}
+tls-crypt-v2 tls-crypt-v2.key
+push \"dhcp-option DNS ${DNS_SERVER_1}\"
+push \"dhcp-option DNS ${DNS_SERVER_2}\"
+push \"redirect-gateway def1 bypass-dhcp\"
+push \"route-ipv6 2000::/3\"
+EOF
+" > /dev/null && \
+printf "%s\n" "Server config file created" || { printf "%s\n" "Failed to create Server config file" && exit 1; }
+
+# servers directory:
+printf "%s\n" "Creating the servers directories"
+mkdir -p /etc/openvpn/servers/"${KEY_CN}"/{bin,ccd,logs} > /dev/null && \
+printf "%s\n" "Servers directories created" || { printf "%s\n" "Failed to create Servers directories" && exit 1; }
+
+touch "/etc/openvpn/servers/${KEY_CN}/ccd/${KEY_CN}_client" > /dev/null && \
+printf "%s\n" "Client file created" || { printf "%s\n" "Failed to create Client file" && exit 1; }
+
+touch "/etc/openvpn/servers/${KEY_CN}/logs/openvpn-status.log" > /dev/null && \
+printf "%s\n" "status file created" || { printf "%s\n" "Failed to create status file" && exit 1; }
+
+touch "/etc/openvpn/servers/${KEY_CN}/logs/openvpn.log" > /dev/null && \
+printf "%s\n" "log-append file created" || { printf "%s\n" "Failed to create log-append file" && exit 1; }
+
+# clients directory:
+printf "%s\n" "Creating the clients directories"
+mkdir -p "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client" > /dev/null && \
+printf "%s\n" "Clients directories created" || { printf "%s\n" "Failed to create Clients directories" && exit 1; }
+
+cp "$KEY_DIR/$CA_NAME"/{ca.crt,"${KEY_CN}"_client.crt,"${KEY_CN}"_client.key} \
+"/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/" > /dev/null && \
+printf "%s\n" "Client files copied" || { printf "%s\n" "Failed to copy Client files" && exit 1; }
+
+# create the tls-crypt-v2 key
+printf "%s\n" "Creating the tls-crypt-v2 key"
+/usr/sbin/openvpn --genkey tls-crypt-v2-server /etc/openvpn/tls-crypt-v2.key > /dev/null && \
+printf "%s\n" "tls-crypt-v2 key created" || { printf "%s\n" "Failed to create tls-crypt-v2 key" && exit 1; }
+
+# # # create the tls-crypt-v2 key for the client
+printf "%s\n" "Creating the tls-crypt-v2 key for the client"
+/usr/sbin/openvpn --tls-crypt-v2 /etc/openvpn/tls-crypt-v2.key \
+--genkey tls-crypt-v2-client /etc/openvpn/tls-crypt-v2-client.key > /dev/null && \
+printf "%s\n" "tls-crypt-v2 key for the client created" || { printf "%s\n" "Failed to create tls-crypt-v2 key for the client" && exit 1; }
+
+# save the tls-crypt-v2-client key to a variable
+TLS_CRYPT_V2_CLIENT_KEY=$(</etc/openvpn/tls-crypt-v2-client.key)
+
+# create the client config file
+printf "%s\n" "Creating the client config file"
+bash -c "cat << EOF > /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf
+client
+proto ${VPN_PROTOCOL}
+dev tun
+ca ca.crt
+cert ${KEY_CN}_client.crt
+key ${KEY_CN}_client.key
+remote ${VPN_SERVER_IP} ${VPN_PORT}
+cipher ${VPN_CIPHER}
+user root
+group root
+verb 2
+mute 20
+keepalive 10 120
+persist-key
+persist-tun
+float
+resolv-retry infinite
+nobind
+mtu-test
+auth ${HMAC_ALG}
+<tls-crypt-v2>
+${TLS_CRYPT_V2_CLIENT_KEY}
+</tls-crypt-v2>
+EOF
+" > /dev/null && \
+printf "%s\n" "Client config file created" || { printf "%s\n" "Failed to create Client config file" && exit 1; }
+
+# create the ovpn file
+printf "%s\n" "Creating the ovpn file"
+bash -c "sed \
+-e '/^\(user root\)/d' \
+-e '/^\(group root\)/d' \
+/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf \
+> /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn" > /dev/null && \
+printf "%s\n" "ovpn file created" || { printf "%s\n" "Failed to create ovpn file" && exit 1; }
