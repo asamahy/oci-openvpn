@@ -19,6 +19,7 @@ timedatectl set-timezone Universal
 INSTANCE_NAME="CHANGE_ME";
 NC_PORT="17486";
 NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
+CHANGE_PASSWORDS="true";
 UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
 INSTANCE_IPv4="10.0.0.2";
@@ -756,25 +757,38 @@ if [ -f /root/.provisioned5 ]; then
     else
     printf "%s\n" "Part 5 has not been run before, executing Part 5"
 
+# skip changing passwords if flag is set to false
+if [ "$CHANGE_PASSWORDS" == "true" ]; then
+    printf "%s\n" "CHANGE_PASSWORDS is set to true, continuing..."
+    
 printf "%s\n" "****************************************"
 printf "%s\n" "Part 5: Changing User Passwords"
 printf "%s\n" "****************************************"
 
 # checking if UBUNTU_PASSWORD is set to default and if so, alert the user to change it
     if [ "$UBUNTU_PASSWORD" == "CHANGE_ME" ]; then
-            printf "%s\n" "UBUNTU_PASSWORD is set to the script default, please change it to the actual password"
-            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD"
-        else
-            printf "%s\n" "Changing the password for the ubuntu and root users"
-
+            printf "%s\n" "UBUNTU_PASSWORD is set to the script default, please change it to an actual password"
             echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null && \
-            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+        else
+            printf "%s\n" "Seting the password for the ubuntu"
+            echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null && \
+            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD for use on Webmin" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+    fi
 
+    if [ "$ROOT_PASSWORD" == "CHANGE_ME" ]; then
+            printf "%s\n" "ROOT_PASSWORD is set to the script default, please change it to an actual password"
+            echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null && \
+            printf "%s\n" "ROOT_PASSWORD is set to $ROOT_PASSWORD" || printf "%s\n" "Failed to set ROOT_PASSWORD"
+        else
+            printf "%s\n" "Seting the password for the root"
             echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null && \
             printf "%s\n" "ROOT_PASSWORD is set to $ROOT_PASSWORD" || printf "%s\n" "Failed to set ROOT_PASSWORD"
     fi
-
-    touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully changed";
+else
+    printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
+fi
+    touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully (un)changed";
 
 
     #check for all the parts to be completed before rebooting
