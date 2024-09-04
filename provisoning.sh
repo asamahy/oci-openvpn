@@ -13,6 +13,9 @@
 ## 
 ##
 ##
+export DEBIAN_FRONTEND=noninteractive
+timedatectl set-timezone Universal
+
 INSTANCE_NAME="CHANGE_ME";
 NC_PORT="17486";
 NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
