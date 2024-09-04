@@ -315,30 +315,30 @@ function update-ingress-security-list(){
         \"protocol\": \"17\",
         \"source\": \"0.0.0.0/0\",
         \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": {
+        \"tcp-options\": null,
+        \"udp-options\": {
         \"destination-port-range\": {
             \"max\": 1194,
             \"min\": 1194
         },
         \"source-port-range\": null
-        },
-        \"udp-options\": null
+        }
         },
         {
-        \"description\": \"OpenVPN IPv6 UDP Port\",
+        \"description\": \"OpenVPN IPv4 UDP Port\",
         \"icmp-options\": null,
         \"is-stateless\": false,
         \"protocol\": \"17\",
         \"source\": \"::/0\",
         \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": {
+        \"tcp-options\": null,
+        \"udp-options\": {
         \"destination-port-range\": {
             \"max\": 1194,
             \"min\": 1194
         },
         \"source-port-range\": null
-        },
-        \"udp-options\": null
+        }
         },
         {
         \"description\": \"Temp Netcat TCP Port\",
