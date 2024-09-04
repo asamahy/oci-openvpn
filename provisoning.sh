@@ -214,6 +214,16 @@ printf "%s\n" "****************************************"
 if [ "$(command -v /root/bin/oci)" ]; then
 printf "%s\n" "OCI CLI is Found"
 printf "%s\n" "Initializing OCI CLI Environment Variables"
+printf "%s\n" "Checking if INSTANCE_NAME have been set or left to default"
+    if [ "$INSTANCE_NAME" == "CHANGE_ME" ]; then
+        printf "%s\n" "INSTANCE_NAME is set to default, please change it to the actual instance name"
+        printf "%s\n" "Exiting..."
+        exit 1
+        else
+        printf "%s\n" "INSTANCE_NAME is set to $INSTANCE_NAME"
+        printf "%s\n" "Continuing..."
+    fi
+
 COMPARTMENT_ID=$(/root/bin/oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
 --include-root --raw-output --query "data[?contains(\"id\",'tenancy')].id | [0]");
 INSTANCE_ID=$(/root/bin/oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
