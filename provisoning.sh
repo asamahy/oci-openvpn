@@ -49,14 +49,16 @@ printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
 
 # install tools
 printf "%s\n" "Installing Tools"
-apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
+apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y && \
+printf "%s\n" "Tools Installed" || printf "%s\n" "Failed to Install Tools"
 
 # generate random seed for openssl and write to /root/.rnd
 printf "%s\n" "Generating Random Seed for OpenSSL"
 openssl rand -writerand /root/.rnd -out /dev/null && \
 printf "%s\n" "Random Seed Generated" || printf "%s\n" "Failed to Generate Random Seed"
 
-# enable ip forwarding for ipv4 and ipv6printf "%s\n" "Enabling IP Forwarding for IPv4 and IPv6"
+# enable ip forwarding for ipv4 and ipv6 
+printf "%s\n" "Enabling IP Forwarding for IPv4 and IPv6"
 sudo sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf && \
@@ -143,7 +145,6 @@ printf "%s\n" "Enabling the Firewall rules"
 sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules enabled" || printf "%s\n" "Failed to enable Firewall rules"
 
-printf "%s\n" "Provisioning completed"
 
 # create file in root directory to indicate that the script has been run
 touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
@@ -167,7 +168,8 @@ bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scrip
 /root/bin/oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
 
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
-## Download the Private Key and Public Key## Open the Private Key in a text editor and copy the contents then paste it here
+## Download the Private Key and Public Key
+## Open the Private Key in a text editor and copy the contents then paste it here
 
 mkdir -p /root/.oci/sessions/DEFAULT
 cat <<EOF > /root/.oci/sessions/DEFAULT/oci_api_key.pem
@@ -220,19 +222,20 @@ VNIC_ID=$(/root/bin/oci compute instance list-vnics --instance-id "$INSTANCE_ID"
 --raw-output --query "data[?contains(\"id\",'vnic')].id | [0]");
 SUBNET_ID=$(/root/bin/oci network vnic get --vnic-id "$VNIC_ID" --raw-output --query "data.\"subnet-id\"");
 VCN_ID=$(/root/bin/oci network subnet get --subnet-id "$SUBNET_ID" --raw-output --query "data.\"vcn-id\"");
-IPv6PREFIX="";
 ROUTE_TABLE_ID=$(/root/bin/oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
 INTERNET_GATEWAY_ID=$(/root/bin/oci network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
 SECURITY_LIST_ID=$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
 CURRENT_INGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
 CURRENT_EGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
+
 # get ipv6 cidr block from vcn
 function get-ipv6-prefix(){
     /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
 };
 # add ipv6 cidr block to vcn
 function add-ipv6-cidr-block(){
-    printf "%s\n" "Adding IPv6 CIDR Block"    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    printf "%s\n" "Adding IPv6 CIDR Block"
+    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
 
@@ -411,9 +414,6 @@ function check-and-assign(){
     fi
 }
 
-# -------------------------------------------
-# Main Script
-# -------------------------------------------
 IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID")
 
 # if IPv6PREFIX is empty, then add a new ipv6 cidr block, assign to subnet, and then assign addresses to the vnic
@@ -454,21 +454,22 @@ if [ -f /root/.provisioned4 ]; then
     else
     printf "%s\n" "Part 4 has not been run before, executing Part 4"
 
-cleanup
 printf "%s\n" "****************************************"
 printf "%s\n" "Part 4: OpenVPN Server Configuration"
 printf "%s\n" "****************************************"
 
 # OpenVPN Server Setup
 # ----------------------------
-printf "%s\n" "Setting up CA Vars";# set the CA Vars:
+printf "%s\n" "Setting up CA Vars";
+# set the CA Vars:
 export CA_NAME='CloudLabCA'
 export KEY_SIZE='2048'
 export CA_EXPIRE='3650'
 export KEY_CN='CloudLabVPN'
 export KEY_CONFIG='/etc/openvpn/openvpn-ssl.cnf'
 export KEY_DIR='/etc/openvpn/keys'
-export KEY_COUNTRY='FR'export KEY_PROVINCE='13'
+export KEY_COUNTRY='FR'
+export KEY_PROVINCE='13'
 export KEY_CITY='Marseille'
 export KEY_ORG='My Org'
 export KEY_EMAIL='me@my.org'
