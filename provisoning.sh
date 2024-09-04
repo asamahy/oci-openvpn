@@ -29,13 +29,20 @@ HMAC_ALG="SHA512";
 function cleanup(){
 printf "%s\n" "Cleaning up temporary files..."
 rm -f openvpn.wbm.gz
-exit 0
 };
+
+# check if this part of the script has been run before to avoid running it again and continue with the rest of the script if it has
+if [ -f /root/.provisioned1 ]; then
+    printf "%s\n" "Part 1 has been run before, skipping..."
+    else
+    printf "%s\n" "Part 1 has not been run before, executing Part 1"
 
 # update the repos and upgrade the system
 printf "%s\n" "****************************************"
 printf "%s\n" "Provisioning Script for Ubuntu 22.04 LTS"
 printf "%s\n\n" "****************************************"
+printf "%s\n" "Part 1: System Update and Tools Installation"
+printf "%s\n" "****************************************"
 printf "%s\n" "Updating System"
 apt-get update && apt-get upgrade -y && \
 printf "%s\n" "System Updated" || printf "%s\n" "Failed to Update System"
@@ -49,8 +56,7 @@ printf "%s\n" "Generating Random Seed for OpenSSL"
 openssl rand -writerand /root/.rnd -out /dev/null && \
 printf "%s\n" "Random Seed Generated" || printf "%s\n" "Failed to Generate Random Seed"
 
-# enable ip forwarding for ipv4 and ipv6
-printf "%s\n" "Enabling IP Forwarding for IPv4 and IPv6"
+# enable ip forwarding for ipv4 and ipv6printf "%s\n" "Enabling IP Forwarding for IPv4 and IPv6"
 sudo sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf && \
@@ -138,17 +144,30 @@ sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules enabled" || printf "%s\n" "Failed to enable Firewall rules"
 
 printf "%s\n" "Provisioning completed"
+
+# create file in root directory to indicate that the script has been run
+touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
+fi
 ############################################
 ## OCI-CLI Installation and Configuration ##
 ###########################################
+# check if this part of the script has been run before to avoid running it again and continue with the rest of the script if it has
+if [ -f /root/.provisioned2 ]; then
+    printf "%s\n" "Part 2 has been run before, skipping..."
+    else
+    printf "%s\n" "Part 2 has not been run before, executing Part 2"
+
+printf "%s\n" "****************************************"
+printf "%s\n" "Part 2: OCI-CLI Installation and Configuration"
+printf "%s\n" "****************************************"
+
 # install oci-cli
 printf "%s\n" "Installing OCI CLI"
 bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
 /root/bin/oci --version && printf "%s\n" "OCI CLI installed successfully" || printf "%s\n" "OCI CLI installation failed"
 
 ## On the Oracle Web UI, go to "Identity" -> "Domains" -> "Default Domain" -> "Users" -> <YOUR-USER-NAME> -> "API Keys" -> "Add API Key"
-## Download the Private Key and Public Key
-## Open the Private Key in a text editor and copy the contents then paste it here
+## Download the Private Key and Public Key## Open the Private Key in a text editor and copy the contents then paste it here
 
 mkdir -p /root/.oci/sessions/DEFAULT
 cat <<EOF > /root/.oci/sessions/DEFAULT/oci_api_key.pem
@@ -175,9 +194,21 @@ EOF
 chmod 600 /root/.oci/sessions/DEFAULT/oci_api_key.pem
 chmod 600 /root/.oci/config
 
+touch /root/.provisioned2 && printf "\n%s\n" "Part 2 completed successfully";
+fi
+
 ###############################################
 ## Assign IPv6 Address to VNIC using OCI-CLI ##
 ###############################################
+if [ -f /root/.provisioned3 ]; then
+    printf "%s\n" "Part 3 has been run before, skipping..."
+    else
+    printf "%s\n" "Part 3 has not been run before, executing Part 3"
+
+printf "%s\n" "****************************************"
+printf "%s\n" "Part 3: Assigning IPv6 Address to VNIC"
+printf "%s\n" "****************************************"
+
 if [ "$(command -v /root/bin/oci)" ]; then
 printf "%s\n" "OCI CLI is Found"
 printf "%s\n" "Initializing OCI CLI Environment Variables"
@@ -201,8 +232,7 @@ function get-ipv6-prefix(){
 };
 # add ipv6 cidr block to vcn
 function add-ipv6-cidr-block(){
-    printf "%s\n" "Adding IPv6 CIDR Block"
-    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
+    printf "%s\n" "Adding IPv6 CIDR Block"    /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
 
@@ -409,11 +439,20 @@ update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
 
 dhclient -6 && printf "%s\n" "IPv6 Address Assigned Successfully to VNIC" || printf "%s\n" "Failed to Assign IPv6 Address to VNIC"
 ping6 -c 3 google.com && printf "%s\n" "IPv6 Connectivity Established" || printf "%s\n" "Failed to Establish IPv6 Connectivity"
+fi # oci-cli check
+
+cleanup
+
+touch /root/.provisioned3 && printf "\n%s\n" "Part 3 completed successfully";
 fi
 ############################################
 ## Create The OpenVPN Server Configuration ##
 ############################################
 
+if [ -f /root/.provisioned4 ]; then
+    printf "%s\n" "Part 4 has been run before, skipping..."
+    else
+    printf "%s\n" "Part 4 has not been run before, executing Part 4"
 
 cleanup
 printf "%s\n" "****************************************"
@@ -422,16 +461,14 @@ printf "%s\n" "****************************************"
 
 # OpenVPN Server Setup
 # ----------------------------
-printf "%s\n" "Setting up CA Vars";
-# set the CA Vars:
+printf "%s\n" "Setting up CA Vars";# set the CA Vars:
 export CA_NAME='CloudLabCA'
 export KEY_SIZE='2048'
 export CA_EXPIRE='3650'
 export KEY_CN='CloudLabVPN'
 export KEY_CONFIG='/etc/openvpn/openvpn-ssl.cnf'
 export KEY_DIR='/etc/openvpn/keys'
-export KEY_COUNTRY='FR'
-export KEY_PROVINCE='13'
+export KEY_COUNTRY='FR'export KEY_PROVINCE='13'
 export KEY_CITY='Marseille'
 export KEY_ORG='My Org'
 export KEY_EMAIL='me@my.org'
@@ -689,3 +726,14 @@ bash -c "sed \
 /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf \
 > /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn" > /dev/null && \
 printf "%s\n" "ovpn file created" || { printf "%s\n" "Failed to create ovpn file" && exit 1; }
+
+touch /root/.provisioned4 && printf "\n%s\n" "Part 4 Done. OpenVPN Server Configuration Completed successfully";
+fi
+
+    #check for all the parts to be completed before rebooting
+    if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ]; then
+        printf "%s\n" "All parts have been completed successfully"
+        printf "%s\n" "Rebooting the server to apply the changes"
+        reboot
+    fi
+fi
