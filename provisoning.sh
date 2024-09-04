@@ -14,6 +14,8 @@
 ##
 ##
 INSTANCE_NAME="CHANGE_ME";
+UBUNTU_PASSWORD="CHANGE_ME";
+ROOT_PASSWORD="CHANGE_ME";
 INSTANCE_IPv4="10.0.0.2";
 VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
 DNS_SERVER_1="1.1.1.1"
@@ -742,8 +744,37 @@ printf "%s\n" "ovpn file created" || { printf "%s\n" "Failed to create ovpn file
 touch /root/.provisioned4 && printf "\n%s\n" "Part 4 Done. OpenVPN Server Configuration Completed successfully";
 fi
 
+############################################
+## Change Users Passwords ##
+############################################
+if [ -f /root/.provisioned5 ]; then
+    printf "%s\n" "Part 5 has been run before, you are all set"
+    else
+    printf "%s\n" "Part 5 has not been run before, executing Part 5"
+
+printf "%s\n" "****************************************"
+printf "%s\n" "Part 5: Changing User Passwords"
+printf "%s\n" "****************************************"
+
+# checking if UBUNTU_PASSWORD is set to default and if so, alert the user to change it
+    if [ "$UBUNTU_PASSWORD" == "CHANGE_ME" ]; then
+            printf "%s\n" "UBUNTU_PASSWORD is set to the script default, please change it to the actual password"
+            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD"
+        else
+            printf "%s\n" "Changing the password for the ubuntu and root users"
+
+            echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null && \
+            printf "%s\n" "UBUNTU_PASSWORD is set to $UBUNTU_PASSWORD" || printf "%s\n" "Failed to set UBUNTU_PASSWORD"
+
+            echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null && \
+            printf "%s\n" "ROOT_PASSWORD is set to $ROOT_PASSWORD" || printf "%s\n" "Failed to set ROOT_PASSWORD"
+    fi
+
+    touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully changed";
+
+
     #check for all the parts to be completed before rebooting
-    if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ]; then
+    if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Rebooting the server to apply the changes"
         reboot
