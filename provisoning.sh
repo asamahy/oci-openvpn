@@ -14,6 +14,8 @@
 ##
 ##
 INSTANCE_NAME="CHANGE_ME";
+NC_PORT="17486";
+NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
 UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
 INSTANCE_IPv4="10.0.0.2";
@@ -24,7 +26,7 @@ VPN_NET_IP="10.50.0.0";
 VPN_NET_MASK="255.255.255.0";
 VPN_CIDR="24";
 VPN_PORT="1194";
-VPN_PROTOCOL="udp";
+VPN_PROTOCOL="udp"; # changes to this will not reflect in OCI security list rules
 VPN_CIPHER="AES-256-CBC";
 HMAC_ALG="SHA512";
 
@@ -117,12 +119,12 @@ printf "%s\n" "Webmin rule added" || printf "%s\n" "Failed to add Webmin rule"
 
 # openvpn port 1194
 printf "%s\n" "Adding OpenVPN rule"
-iptables -I INPUT $((++ rule_number)) -p udp -m udp --dport 1194 -j ACCEPT && \
+iptables -I INPUT $((++ rule_number)) -p $VPN_PROTOCOL -m $VPN_PROTOCOL --dport $VPN_PORT -j ACCEPT && \
 printf "%s\n" "OpenVPN rule added" || printf "%s\n" "Failed to add OpenVPN rule"
 
 # temp netcat port 17486
 printf "%s\n" "Adding Temp. Netcat rule"
-iptables -I INPUT $((++ rule_number)) -p tcp -m state -m tcp --dport 17486 --state NEW -j ACCEPT && \
+iptables -I INPUT $((++ rule_number)) -p $NC_PROTOCOL -m state -m $NC_PROTOCOL --dport $NC_PORT --state NEW -j ACCEPT && \
 printf "%s\n" "Temp. Netcat rule added" || printf "%s\n" "Failed to add Temp. Netcat rule"
 
 # delete FORWARD rules with reject-with icmp-host-prohibited rule
@@ -133,10 +135,9 @@ awk '{print $1}' | xargs -I {} iptables -D FORWARD {} && \
 printf "%s\n" "Deleted FORWARD rules" || printf "%s\n" "No FORWARD rules found"
 
 # NAT Rules for OpenVPN Server on ens3 interface with IP 10.50.0.0/24
-iptables -t nat -A POSTROUTING -s 10.50.0.0/24 -o ens3 -j SNAT --to-source 10.0.0.2 && \
+iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4" && \
 printf "%s\n" "NAT POSTROUTING Rules Added" || printf "%s\n" "Failed to Add NAT POSTROUTING Rules"
 
-sleep 2
 # save the rules
 printf "%s\n" "Saving the Firewall rules"
 sh -c 'iptables-save > /etc/iptables/rules.v4' && \
@@ -374,8 +375,8 @@ function update-ingress-security-list(){
         \"tcp-options\": null,
         \"udp-options\": {
         \"destination-port-range\": {
-            \"max\": 1194,
-            \"min\": 1194
+            \"max\": \"${VPN_PORT}\",
+            \"min\": \"${VPN_PORT}\"
         },
         \"source-port-range\": null
         }
@@ -390,8 +391,8 @@ function update-ingress-security-list(){
         \"tcp-options\": null,
         \"udp-options\": {
         \"destination-port-range\": {
-            \"max\": 1194,
-            \"min\": 1194
+            \"max\": \"${VPN_PORT}\",
+            \"min\": \"${VPN_PORT}\"
         },
         \"source-port-range\": null
         }
@@ -405,8 +406,8 @@ function update-ingress-security-list(){
         \"source-type\": \"CIDR_BLOCK\",
         \"tcp-options\": {
         \"destination-port-range\": {
-            \"max\": 17486,
-            \"min\": 17486
+            \"max\": \"${NC_PORT}\",
+            \"min\": \"${NC_PORT}\"
         },
         \"source-port-range\": null
         },
