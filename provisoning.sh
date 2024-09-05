@@ -15,8 +15,7 @@ ROOT_PASSWORD="CHANGE_ME";
 route=$(ip route get 8.8.8.8)
 INSTANCE_IPv4="$(printf ${route#*src })";
 VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
-DNS_SERVER_1="1.1.1.1"
-DNS_SERVER_2="8.8.8.8"
+DNS_SERVER_1="$INSTANCE_IPv4"
 VPN_NET_IP="10.50.0.0";
 VPN_NET_MASK="255.255.255.0";
 VPN_CIDR="24";
@@ -50,10 +49,10 @@ sudo sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
 update_openssl_conf "/etc/ssl/openssl.cnf"
-bash -c "$(curl -L  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force
+bash -c "$(curl -sSL  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force
 apt-get install webmin --install-recommends -y
 update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
-curl -L -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
+curl -sSL -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
 /usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
 rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 add_iptables_rule 10000 tcp "Webmin"
@@ -392,7 +391,7 @@ openssl ca -days 3650 -batch \
 -in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -keyfile "$KEY_DIR/${CA_NAME}/ca.key" \
 -cert "$KEY_DIR/${CA_NAME}/ca.crt" \
--config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null 2>&1
 
 mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/
 
@@ -431,7 +430,6 @@ ifconfig-ipv6-pool ${IPv6PREFIX%/*}1:2/124
 auth ${HMAC_ALG}
 tls-crypt-v2 tls-crypt-v2.key
 push \"dhcp-option DNS ${DNS_SERVER_1}\"
-push \"dhcp-option DNS ${DNS_SERVER_2}\"
 push \"redirect-gateway def1 bypass-dhcp\"
 push \"route-ipv6 2000::/3\"
 EOF
@@ -478,7 +476,6 @@ ${TLS_CRYPT_V2_CLIENT_KEY}
 </tls-crypt-v2>
 EOF
 "
-
 bash -c "sed \
 -e '/^\(user root\)/d' \
 -e '/^\(group root\)/d' \
@@ -499,7 +496,7 @@ printf "%s\n" "Part 5: Changing User Passwords"
 else
     printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
 fi
-    touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully (un)changed";
+    touch /root/.provisioned5
     if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
