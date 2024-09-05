@@ -4,6 +4,7 @@
 ## Date: 2024-08-24
 ## Version: 1.0
 ## License: GPL-3.0
+set -e
 timedatectl set-timezone Universal
 
 INSTANCE_NAME="CHANGE_ME";
@@ -12,6 +13,7 @@ NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
 CHANGE_PASSWORDS="true";
 UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
+PI_HOLE_PASSWORD="CHANGE_ME";
 route=$(ip route get 8.8.8.8)
 INSTANCE_IPv4="$(printf ${route#*src })";
 VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
@@ -501,4 +503,5 @@ fi
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
+sudo bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- $PI_HOLE_PASSWORD #pihole
 fi
