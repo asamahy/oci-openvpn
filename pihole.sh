@@ -71,6 +71,7 @@ if [ -f /root/.provisioned7 ]; then
     printf "%s\n" "Part 7 has been run before, you are all set"
     else
 pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
+mkdir -p /etc/pihole
 bash -c "cat << EOF > /etc/pihole/setupVars.conf
 PIHOLE_INTERFACE=ens3
 QUERY_LOGGING=true
@@ -90,7 +91,7 @@ PIHOLE_DNS_2=::1#5053
 EOF
 "
 curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
-rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
+rule_number="$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')"
 iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$INSTANCE_IPv4" -j ACCEPT
 sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
@@ -98,3 +99,4 @@ printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to ena
 printf "%s\n" "Pi-hole installed"
 touch /root/.provisioned7 && printf "%s\n" "Part 7 done"
 sleep 5 && reboot
+
