@@ -9,6 +9,9 @@ INSTANCE_IPv4="$4"
 
 # cloudflared
 set -e
+if [ -f /root/.provisioned6 ]; then
+    printf "%s\n" "Part 6 has been run before, you are all set"
+    else
 curl -sSLO https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
 apt-get -qqy install ./cloudflared-linux-amd64.deb -y && \
 printf "%s\n" "Cloudflared installed" || printf "%s\n" "Failed to install Cloudflared" && \
@@ -59,8 +62,14 @@ EOF
 chmod +x /etc/cron.weekly/cloudflared-updater
 chown root:root /etc/cron.weekly/cloudflared-updater
 
+touch /root/.provisioned6 && printf "%s\n" "Part 6 done"
+fi
+
+
 # pihole
-# shellcheck disable=SC2059
+if [ -f /root/.provisioned7 ]; then
+    printf "%s\n" "Part 7 has been run before, you are all set"
+    else
 pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
 bash -c "cat << EOF > /etc/pihole/setupVars.conf
 PIHOLE_INTERFACE=ens3
@@ -87,3 +96,5 @@ sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 
 printf "%s\n" "Pi-hole installed"
+touch /root/.provisioned7 && printf "%s\n" "Part 7 done"
+sleep 5 && reboot

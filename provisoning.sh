@@ -45,7 +45,7 @@ add_iptables_rule() {
 };
 printf "%s\n" "Part 1: System Update and Tools Installation"
 apt-get update -qq && apt-get upgrade -qqy 
-apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -qqy
+apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn cron -qqy
 openssl rand -writerand /root/.rnd -out /dev/null
 sudo sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
@@ -499,9 +499,10 @@ else
     printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
 fi
     touch /root/.provisioned5
+fi
     if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
 sudo bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- "$PI_HOLE_PASSWORD" "${VPN_NET_IP}/${VPN_CIDR}" "$INSTANCE_IPv4 "
-fi
+
