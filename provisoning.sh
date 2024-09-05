@@ -27,57 +27,46 @@ HMAC_ALG="SHA512";
 if [ -f /root/.provisioned1 ]; then
     printf "%s\n" "Part 1 has been run before, skipping..."
     else
+update_openssl_conf() {
+    local conf_file=$1
+    sed -i \
+    -e 's/^\(default_days\s*=\s*\)[^#[:space:]]*/\13650/' \
+    -e 's/^\(default_crl_days\s*=\s*\)[^#[:space:]]*/\13650/' \
+    -e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' "$conf_file"
+};
+add_iptables_rule() {
+    local port=$1
+    local protocol=$2
+    local description=$3
+    iptables -I INPUT $((++rule_number)) -p "$protocol" -m conntrack --ctstate NEW --dport "$port" -j ACCEPT && \
+    printf "%s\n" "$description rule added" || printf "%s\n" "Failed to add $description rule"
+};
 printf "%s\n" "Part 1: System Update and Tools Installation"
-apt-get update && apt-get upgrade -y
-apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -y
+apt-get update -qq && apt-get upgrade -qqy 
+apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn -qqy
 openssl rand -writerand /root/.rnd -out /dev/null
-
 sudo sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
-
-sudo sed -i \
--e 's/^\(default_days\s*=\s*\)[^#[:space:]]*/\13650/' \
--e 's/^\(default_crl_days\s*=\s*\)[^#[:space:]]*/\13650/' \
--e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' /etc/ssl/openssl.cnf 
-
+update_openssl_conf "/etc/ssl/openssl.cnf"
 bash -c "$(curl -L  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force
 apt-get install webmin --install-recommends -y
-
-sudo sed -i \
--e 's/^\(default_days\s*=\s*\)[^#[:space:]]*/\13650/' \
--e 's/^\(default_crl_days\s*=\s*\)[^#[:space:]]*/\13650/' \
--e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' /usr/share/webmin/acl/openssl.cnf
-
-curl -L -o openvpn.wbm.gz https://github.com/nicsure/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
+update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
+curl -L -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
 /usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
-
-sed -i \
--e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' /usr/share/webmin/openvpn/openvpn-ssl.cnf
-
 rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
-
-iptables -I INPUT $((++ rule_number)) -p tcp -m state -m tcp --dport 10000 --state NEW -j ACCEPT && \
-printf "%s\n" "Webmin rule added" || printf "%s\n" "Failed to add Webmin rule"
-
-iptables -I INPUT $((++ rule_number)) -p $VPN_PROTOCOL -m $VPN_PROTOCOL --dport $VPN_PORT -j ACCEPT && \
-printf "%s\n" "OpenVPN rule added" || printf "%s\n" "Failed to add OpenVPN rule"
-
-iptables -I INPUT $((++ rule_number)) -p $NC_PROTOCOL -m state -m $NC_PROTOCOL --dport $NC_PORT --state NEW -j ACCEPT && \
-printf "%s\n" "Temp. Netcat rule added" || printf "%s\n" "Failed to add Temp. Netcat rule"
-
+add_iptables_rule 10000 tcp "Webmin"
+add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
+add_iptables_rule $NC_PORT $NC_PROTOCOL "Netcat"
 iptables -L FORWARD --line-numbers | \
 grep -E 'reject-with.*icmp-host-prohibited' | \
 awk '{print $1}' | xargs -I {} iptables -D FORWARD {} && \
 printf "%s\n" "Deleted FORWARD rules" || printf "%s\n" "No FORWARD rules found"
-
 iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4" && \
 printf "%s\n" "NAT POSTROUTING Rules Added" || printf "%s\n" "Failed to Add NAT POSTROUTING Rules"
-
 sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
-
-touch /root/.provisioned1
+touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
 fi
 
 if [ -f /root/.provisioned2 ]; then
@@ -85,7 +74,7 @@ if [ -f /root/.provisioned2 ]; then
     else
 printf "%s\n" "Part 2: OCI-CLI Installation and Configuration"
 
-bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults > /dev/null
+bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
 /root/bin/oci --version
 
 mkdir -p /root/.oci/sessions/DEFAULT
@@ -121,7 +110,6 @@ if [ "$(command -v /root/bin/oci)" ]; then
         printf "%s\n" "INSTANCE_NAME is set to script default, Exiting..."
         exit 1
     fi
-
 COMPARTMENT_ID=$(/root/bin/oci iam compartment list --all --compartment-id-in-subtree true --access-level ACCESSIBLE \
 --include-root --raw-output --query "data[?contains(\"id\",'tenancy')].id | [0]");
 INSTANCE_ID=$(/root/bin/oci compute instance list --compartment-id "$COMPARTMENT_ID" --display-name "$INSTANCE_NAME" \
@@ -139,12 +127,10 @@ CURRENT_EGRESS_RULES="$(/root/bin/oci network security-list list --compartment-i
 function get-ipv6-prefix(){
     /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
 };
-
 function add-ipv6-cidr-block(){
     /root/bin/oci network vcn add-ipv6-vcn-cidr --vcn-id "$1" > /dev/null && \
     printf "%s\n" "IPv6 CIDR Block Added" || printf "%s\n" "Failed to Add IPv6 CIDR Block"
 };
-
 function check-ipv6-ips(){
     VNIC_ID=$1
     i=$2
@@ -157,7 +143,6 @@ function check-ipv6-ips(){
     sleep 3
     fi
 }
-
 function assign-ipv6-address-range(){
     IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID");
     for i in {1..15}; do
@@ -168,16 +153,13 @@ function assign-ipv6-address-range(){
     done && \
     printf "%s\n" "IPv6 Addresses Assigned Successfully" || printf "%s\n" "Failed to Assign IPv6 Addresses to the VNIC"
 };
-
 function check-ipv6-subnet(){
     /root/bin/oci network subnet get --subnet-id "$1" --raw-output --query "data.\"ipv6-cidr-block\""
 };
-
 function assign-ipv6-to-subnet(){
     /root/bin/oci network subnet add-ipv6-subnet-cidr --subnet-id "$1" --ipv6-cidr-block "${2%/*}/64" > /dev/null 2>&1 && \
     printf "%s\n" "IPv6 CIDR Block Assigned to the Subnet" || printf "%s\n" "Failed to Assign IPv6 CIDR Block to the Subnet"
 };
-
 function add-ipv4-ipv6-internet-route(){
     /root/bin/oci network route-table update --rt-id "$1" --route-rules "[{
         \"cidr-block\": null,
@@ -197,7 +179,6 @@ function add-ipv4-ipv6-internet-route(){
     }]" --force > /dev/null && \
     printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
 };
-
 function update-egress-security-list(){
     /root/bin/oci network security-list update --security-list-id "$1" --egress-security-rules "${2%\]*},{
         \"description\": null,
@@ -211,7 +192,6 @@ function update-egress-security-list(){
     }]" --force > /dev/null && \
     printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
 };
-
 function update-ingress-security-list(){
     /root/bin/oci network security-list update --security-list-id "$1" --ingress-security-rules "${2%\]*},{
         \"description\": \"Tailscale IPv4 Direct Connection\",
@@ -294,7 +274,6 @@ function update-ingress-security-list(){
     }]" --force > /dev/null && \
     printf "%s\n" "Ingress Security List Rules Updated" || printf "%s\n" "Failed to Update Ingress Security List Rules";
 };
-
 function check-and-assign(){
     if [ -z "$(check-ipv6-subnet "$SUBNET_ID")" ]; then
         assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")" && \
@@ -304,10 +283,8 @@ function check-and-assign(){
         printf "%s\n" "IPv6 CIDR Block Already Assigned to the Subnet"
         assign-ipv6-address-range "$VNIC_ID";
     fi
-}
-
+};
 IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID")
-
 if [[ -z "${IPv6PREFIX}" ]]; then
     printf "%s\n" "IPv6 CIDR Block does not exist"
     add-ipv6-cidr-block "$VCN_ID"
@@ -317,16 +294,11 @@ if [[ -z "${IPv6PREFIX}" ]]; then
     printf "%s\n" "IPv6 CIDR Block already exists"
     check-and-assign
 fi
-
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
-
 update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
-
 update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
-
 dhclient -6 && ping6 -c 1 google.com
 fi # oci-cli check
-
 touch /root/.provisioned3 && printf "\n%s\n" "Part 3 completed successfully";
 fi
 
@@ -334,7 +306,6 @@ if [ -f /root/.provisioned4 ]; then
     printf "%s\n" "Part 4 has been run before, skipping..."
     else
 printf "%s\n" "Part 4: OpenVPN Server Configuration"
-
 export CA_NAME='CloudLabCA'
 export KEY_SIZE='2048'
 export CA_EXPIRE='3650'
@@ -347,7 +318,6 @@ export KEY_CITY='Marseille'
 export KEY_ORG='My Org'
 export KEY_EMAIL='me@my.org'
 export KEY_OU='Cloud Lab'
-
 cp /usr/share/webmin/openvpn/openvpn-ssl.cnf /etc/openvpn/
 bash -c "sed \
 -e 's/^\(database\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/index.txt/' \
@@ -375,7 +345,6 @@ EOF
 
 openssl dhparam -out "${KEY_DIR}/${CA_NAME}/dh${KEY_SIZE}.pem" "$KEY_SIZE" > /dev/null 2>&1 && \
 printf "%s\n" "Deffie-Hellman key created" || { printf "%s\n" "Failed to create Deffie-Hellman key" && exit 1; }
-
 bash -c "touch "${KEY_DIR}/${CA_NAME}/index.txt"" 
 bash -c "echo 01 > "${KEY_DIR}/${CA_NAME}/serial""
 
@@ -383,7 +352,6 @@ bash -c "echo 01 > "${KEY_DIR}/${CA_NAME}/serial""
 -keyout "${KEY_DIR}/${CA_NAME}/ca.key" \
 -out "${KEY_DIR}/${CA_NAME}/ca.crt" \
 -config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1
-
 /usr/bin/openssl ca -gencrl \
 -keyfile "${KEY_DIR}/${CA_NAME}/ca.key" \
 -cert "${KEY_DIR}/${CA_NAME}/ca.crt" \
@@ -400,7 +368,6 @@ openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -extensions server \
 -config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1
-
 openssl ca -days 3650 -batch \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
 -in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
@@ -410,7 +377,6 @@ openssl ca -days 3650 -batch \
 -config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null
 
 mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/ > /dev/null 
-
 bash -c "echo -e 'Do not remove this file. It will be used from webmin OpenVPN Administration interface.' \
 > "$KEY_DIR/${CA_NAME}/${KEY_CN}".server" > /dev/null
 
@@ -420,7 +386,6 @@ openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
 -keyout "$KEY_DIR/${CA_NAME}/${KEY_CN}.key" \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -config /etc/openvpn/openvpn-ssl.cnf > /dev/null
-
 openssl ca -days 3650 -batch \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
 -in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
@@ -433,7 +398,6 @@ mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/
 export KEY_CN="${KEY_CN%_client}"
 
 IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID");
-
 bash -c "cat << EOF > /etc/openvpn/${KEY_CN}.conf
 port ${VPN_PORT}
 proto ${VPN_PROTOCOL}
@@ -480,14 +444,11 @@ touch "/etc/openvpn/servers/${KEY_CN}/ccd/${KEY_CN}_client" \
 
 cp "$KEY_DIR/$CA_NAME"/{ca.crt,"${KEY_CN}"_client.crt,"${KEY_CN}"_client.key} \
 "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/"
-
 printf "%s\n" "Creating the tls-crypt-v2 key"
 /usr/sbin/openvpn --genkey tls-crypt-v2-server /etc/openvpn/tls-crypt-v2.key > /dev/null
-
 printf "%s\n" "Creating the tls-crypt-v2 key for the client"
 /usr/sbin/openvpn --tls-crypt-v2 /etc/openvpn/tls-crypt-v2.key \
 --genkey tls-crypt-v2-client /etc/openvpn/tls-crypt-v2-client.key > /dev/null
-
 TLS_CRYPT_V2_CLIENT_KEY=$(</etc/openvpn/tls-crypt-v2-client.key)
 
 bash -c "cat << EOF > /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf
@@ -530,16 +491,7 @@ if [ -f /root/.provisioned5 ]; then
     printf "%s\n" "Part 5 has been run before, you are all set"
     else
     printf "%s\n" "Part 5 has not been run before, executing Part 5"
-
-if [ "$CHANGE_PASSWORDS" == "true" ]; then
-if [ "$CHANGE_PASSWORDS" == "true" ]; then
-    printf "%s\n" "CHANGE_PASSWORDS is set to true, continuing..."
-    
-printf "%s\n" "****************************************"
 if [ "$CHANGE_PASSWORDS" == "true" ]; then    
-    printf "%s\n" "CHANGE_PASSWORDS is set to true, continuing..."
-    
-printf "%s\n" "****************************************"
 printf "%s\n" "Part 5: Changing User Passwords"
             echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null
             echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null
@@ -547,7 +499,6 @@ else
     printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
 fi
     touch /root/.provisioned5 && printf "\n%s\n" "Part 5 Done. Passwords Has been successfully (un)changed";
-
     if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
