@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2059,SC2086
 
 # Install Pi-hole and Cloudflared
-PI_HOLE_PASSWORD=$1
+PI_HOLE_PASSWORD="$1"
+VPN_NET_IP="$2"
+VPN_CIDR="$3"
+INSTANCE_IPv4="$4"
 
 # cloudflared
 set -e
@@ -56,6 +60,7 @@ chmod +x /etc/cron.weekly/cloudflared-updater
 chown root:root /etc/cron.weekly/cloudflared-updater
 
 # pihole
+# shellcheck disable=SC2059
 pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
 bash -c "cat << EOF > /etc/pihole/setupVars.conf
 PIHOLE_INTERFACE=ens3
@@ -77,7 +82,7 @@ EOF
 "
 curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
 rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
-iptables -I INPUT $((++rule_number)) -i tun0 -s 10.50.0.0/24 -d 10.0.0.2 -j ACCEPT
+iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$INSTANCE_IPv4" -j ACCEPT
 sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 

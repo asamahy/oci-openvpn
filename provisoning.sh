@@ -503,5 +503,5 @@ fi
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
-sudo bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- $PI_HOLE_PASSWORD #pihole
+sudo bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- "$PI_HOLE_PASSWORD" "${VPN_NET_IP}/${VPN_CIDR}" "$INSTANCE_IPv4 "
 fi
