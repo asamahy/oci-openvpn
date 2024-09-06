@@ -47,7 +47,7 @@ printf "%s\n" "Part 1: System Update and Tools Installation"
 apt-get update -qq && apt-get upgrade -qqy 
 apt-get install net-tools nano rand apt-utils dialog iputils-ping dnsutils openvpn cron -qqy
 openssl rand -writerand /root/.rnd -out /dev/null
-sudo sed -i \
+sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
 update_openssl_conf "/etc/ssl/openssl.cnf"
@@ -56,7 +56,7 @@ apt-get install webmin --install-recommends -y
 update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
 curl -sSL -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
 /usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
-rule_number=$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
+rule_number=$(iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 add_iptables_rule 10000 tcp "Webmin"
 add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
 add_iptables_rule $NC_PORT $NC_PROTOCOL "Netcat"
@@ -493,8 +493,8 @@ if [ -f /root/.provisioned5 ]; then
     printf "%s\n" "Part 5 has not been run before, executing Part 5"
 if [ "$CHANGE_PASSWORDS" == "true" ]; then    
 printf "%s\n" "Part 5: Changing User Passwords"
-            echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | sudo passwd ubuntu > /dev/null
-            echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | sudo passwd root > /dev/null
+            echo -e "${UBUNTU_PASSWORD}\n${UBUNTU_PASSWORD}" | passwd ubuntu > /dev/null
+            echo -e "${ROOT_PASSWORD}\n${ROOT_PASSWORD}" | passwd root > /dev/null
 else
     printf "%s\n" "CHANGE_PASSWORDS is set to false, skipping..."
 fi
@@ -504,5 +504,5 @@ fi
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
-sudo bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- "$PI_HOLE_PASSWORD" "${VPN_NET_IP}/${VPN_CIDR}" "$INSTANCE_IPv4 "
+bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- "$PI_HOLE_PASSWORD" "${VPN_NET_IP}/${VPN_CIDR}" "$INSTANCE_IPv4 "
 
