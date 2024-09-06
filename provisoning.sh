@@ -13,14 +13,15 @@ NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
 CHANGE_PASSWORDS="true";
 UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
-PI_HOLE_PASSWORD="CHANGE_ME";
+export PI_HOLE_PASSWORD="CHANGE_ME";
 route=$(ip route get 8.8.8.8)
 INSTANCE_IPv4="$(printf ${route#*src })";
+export INSTANCE_IPv4
 VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
 DNS_SERVER_1="$INSTANCE_IPv4"
-VPN_NET_IP="10.50.0.0";
+export VPN_NET_IP="10.50.0.0";
 VPN_NET_MASK="255.255.255.0";
-VPN_CIDR="24";
+export VPN_CIDR="24";
 VPN_PORT="1194";
 VPN_PROTOCOL="udp"; # changes to this will not reflect in OCI security list rules
 VPN_CIPHER="AES-256-CBC";
@@ -462,5 +463,7 @@ fi
         printf "%s\n" "All parts have been completed successfully"
         printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
-bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)" -- "$PI_HOLE_PASSWORD" "${VPN_NET_IP}/${VPN_CIDR}" "$INSTANCE_IPv4 "
-
+export rule_number
+export -f add_iptables_rule
+export -f update-security-list
+bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)"

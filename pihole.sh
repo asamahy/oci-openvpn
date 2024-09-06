@@ -2,9 +2,7 @@
 # shellcheck disable=SC2059,SC2086
 
 # Install Pi-hole and Cloudflared
-PI_HOLE_PASSWORD="$1"
-VPN_NET_IP="$2"
-INSTANCE_IPv4="$3"
+
 
 # cloudflared
 set -e
@@ -85,17 +83,102 @@ WEBPASSWORD=$(printf ${pass})
 BLOCKING_ENABLED=true
 DNSSEC=false
 REV_SERVER=false
-PIHOLE_DNS_1=127.0.0.1#5053
-PIHOLE_DNS_2=::1#5053
+PIHOLE_DNS_1=127.0.0.1#5335
+PIHOLE_DNS_2=::1#5335
 EOF
 "
 curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
 rule_number="$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')"
-iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}" -d "$INSTANCE_IPv4" -j ACCEPT
-sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
-printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
+iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$INSTANCE_IPv4" -j ACCEPT
+add_iptables_rule 53 udp "PI-Hole DNS UDP"
+add_iptables_rule 53 tcp "PI-Hole DNS TCP"
+update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
+update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
 
 printf "%s\n" "Pi-hole installed"
 touch /root/.provisioned7 && printf "%s\n" "Part 7 done"
-sleep 5 && reboot
 fi
+
+if [ -f /root/.provisioned8 ]; then
+    printf "%s\n" "Part 8 has been run before, you are all set"
+    else
+    # unbound
+apt-get -qqy install unbound
+mkdir -p /etc/unbound/unbound.conf.d/
+cat << EOF > /etc/unbound/unbound.conf.d/pi-hole.conf
+server:
+# If no logfile is specified, syslog is used
+# logfile: "/var/log/unbound/unbound.log"
+verbosity: 0
+
+interface: 127.0.0.1
+port: 5335
+do-ip4: yes
+do-udp: yes
+do-tcp: yes
+
+# May be set to yes if you have IPv6 connectivity
+do-ip6: no
+
+# You want to leave this to no unless you have *native* IPv6. With 6to4 and
+# Terredo tunnels your web browser should favor IPv4 for the same reasons
+prefer-ip6: no
+
+# Use this only when you downloaded the list of primary root servers!
+# If you use the default dns-root-data package, unbound will find it automatically
+#root-hints: "/var/lib/unbound/root.hints"
+
+# Trust glue only if it is within the server's authority
+harden-glue: yes
+
+# Require DNSSEC data for trust-anchored zones, if such data is absent, the zone becomes BOGUS
+harden-dnssec-stripped: yes
+
+# Don't use Capitalization randomization as it known to cause DNSSEC issues sometimes
+# see https://discourse.pi-hole.net/t/unbound-stubby-or-dnscrypt-proxy/9378 for further details
+use-caps-for-id: no
+
+# Reduce EDNS reassembly buffer size.
+# IP fragmentation is unreliable on the Internet today, and can cause
+# transmission failures when large DNS messages are sent via UDP. Even
+# when fragmentation does work, it may not be secure; it is theoretically
+# possible to spoof parts of a fragmented DNS message, without easy
+# detection at the receiving end. Recently, there was an excellent study
+# >>> Defragmenting DNS - Determining the optimal maximum UDP response size for DNS <<<
+# by Axel Koolhaas, and Tjeerd Slokker (https://indico.dns-oarc.net/event/36/contributions/776/)
+# in collaboration with NLnet Labs explored DNS using real world data from the
+# the RIPE Atlas probes and the researchers suggested different values for
+# IPv4 and IPv6 and in different scenarios. They advise that servers should
+# be configured to limit DNS messages sent over UDP to a size that will not
+# trigger fragmentation on typical network links. DNS servers can switch
+# from UDP to TCP when a DNS response is too big to fit in this limited
+# buffer size. This value has also been suggested in DNS Flag Day 2020.
+edns-buffer-size: 1232
+
+# Perform prefetching of close to expired message cache entries
+# This only applies to domains that have been frequently queried
+prefetch: yes
+
+# One thread should be sufficient, can be increased on beefy machines. In reality for most users running on small networks or on a single machine, it should be unnecessary to seek performance enhancement by increasing num-threads above 1.
+num-threads: 1
+
+# Ensure kernel buffer is large enough to not lose messages in traffic spikes
+so-rcvbuf: 1m
+
+# Ensure privacy of local IP ranges
+private-address: 192.168.0.0/16
+private-address: 169.254.0.0/16
+private-address: 172.16.0.0/12
+private-address: 10.0.0.0/8
+private-address: fd00::/8
+private-address: fe80::/10
+EOF
+
+sudo service unbound restart
+
+echo 'edns-packet-max=1232' > /etc/dnsmasq.d/99-edns.conf
+sudo systemctl disable --now unbound-resolvconf.service
+
+touch /root/.provisioned8 && printf "%s\n" "Part 8 done"
+fi
+sleep 5 && reboot
