@@ -4,8 +4,7 @@
 # Install Pi-hole and Cloudflared
 PI_HOLE_PASSWORD="$1"
 VPN_NET_IP="$2"
-VPN_CIDR="$3"
-INSTANCE_IPv4="$4"
+INSTANCE_IPv4="$3"
 
 # cloudflared
 set -e
@@ -92,11 +91,11 @@ EOF
 "
 curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
 rule_number="$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')"
-iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$INSTANCE_IPv4" -j ACCEPT
+iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}" -d "$INSTANCE_IPv4" -j ACCEPT
 sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 
 printf "%s\n" "Pi-hole installed"
 touch /root/.provisioned7 && printf "%s\n" "Part 7 done"
 sleep 5 && reboot
-
+fi
