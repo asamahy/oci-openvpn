@@ -57,15 +57,13 @@ update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
 curl -sSL -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
 /usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
 rule_number=$(iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
+iptables -L FORWARD --line-numbers | \
+grep -E 'reject-with.*icmp-host-prohibited' | \
+awk '{print $1}' | xargs -I {} iptables -D FORWARD {}
+iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4"
 add_iptables_rule 10000 tcp "Webmin"
 add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
 add_iptables_rule $NC_PORT $NC_PROTOCOL "Netcat"
-iptables -L FORWARD --line-numbers | \
-grep -E 'reject-with.*icmp-host-prohibited' | \
-awk '{print $1}' | xargs -I {} iptables -D FORWARD {} && \
-printf "%s\n" "Deleted FORWARD rules" || printf "%s\n" "No FORWARD rules found"
-iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4" && \
-printf "%s\n" "NAT POSTROUTING Rules Added" || printf "%s\n" "Failed to Add NAT POSTROUTING Rules"
 sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
 printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
