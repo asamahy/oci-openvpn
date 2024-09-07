@@ -42,6 +42,8 @@ add_iptables_rule() {
     local description=$3
     iptables -I INPUT $((++rule_number)) -p "$protocol" -m conntrack --ctstate NEW --dport "$port" -j ACCEPT && \
     printf "%s\n" "$description rule added" || printf "%s\n" "Failed to add $description rule"
+    sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
+    printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 };
 printf "%s\n" "Part 1: System Update and Tools Installation"
 apt-get update -qq && apt-get upgrade -qqy 
@@ -64,8 +66,6 @@ iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --
 add_iptables_rule 10000 tcp "Webmin"
 add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
 add_iptables_rule $NC_PORT $NC_PROTOCOL "Netcat"
-sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
-printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
 fi
 
