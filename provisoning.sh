@@ -8,8 +8,6 @@ set -e
 timedatectl set-timezone Universal
 
 INSTANCE_NAME="CHANGE_ME";
-NC_PORT="17486";
-NC_PROTOCOL="tcp"; # changes to this will not reflect in OCI security list rules
 CHANGE_PASSWORDS="true";
 UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
@@ -23,7 +21,9 @@ export VPN_NET_IP="10.50.0.0";
 VPN_NET_MASK="255.255.255.0";
 export VPN_CIDR="24";
 VPN_PORT="1194";
-VPN_PROTOCOL="udp"; # changes to this will not reflect in OCI security list rules
+NC_PORT="17486";
+NC_PROTOCOL="tcp";
+VPN_PROTOCOL="udp";
 VPN_CIPHER="AES-256-CBC";
 HMAC_ALG="SHA512";
 
