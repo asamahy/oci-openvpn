@@ -121,8 +121,6 @@ VCN_ID=$(/root/bin/oci network subnet get --subnet-id "$SUBNET_ID" --raw-output 
 ROUTE_TABLE_ID=$(/root/bin/oci network route-table list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'routetable')].id | [0]");
 INTERNET_GATEWAY_ID=$(/root/bin/oci network internet-gateway list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'internetgateway')].id | [0]");
 SECURITY_LIST_ID=$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[?contains(\"id\",'securitylist')].id | [0]");
-CURRENT_INGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]")";
-CURRENT_EGRESS_RULES="$(/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]")";
 
 function get-ipv6-prefix(){
     /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
@@ -179,101 +177,59 @@ function add-ipv4-ipv6-internet-route(){
     }]" --force > /dev/null && \
     printf "%s\n" "IPv4 and IPv6 Internet Routes Added" || printf "%s\n" "Failed to Add IPv4 and IPv6 Internet Routes";
 };
-function update-egress-security-list(){
-    /root/bin/oci network security-list update --security-list-id "$1" --egress-security-rules "${2%\]*},{
-        \"description\": null,
-        \"destination\": \"::/0\",
-        \"destination-type\": \"CIDR_BLOCK\",
-        \"icmp-options\": null,
-        \"is-stateless\": false,
-        \"protocol\": \"all\",
-        \"tcp-options\": null,
-        \"udp-options\": null
-    }]" --force > /dev/null && \
-    printf "%s\n" "Egress Security List Rules Updated" || printf "%s\n" "Failed to Update Egress Security List Rules";
-};
-function update-ingress-security-list(){
-    /root/bin/oci network security-list update --security-list-id "$1" --ingress-security-rules "${2%\]*},{
-        \"description\": \"Tailscale IPv4 Direct Connection\",
-        \"icmp-options\": null,
-        \"is-stateless\": true,
-        \"protocol\": \"17\",
-        \"source\": \"0.0.0.0/0\",
-        \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": null,
-        \"udp-options\": {
-        \"destination-port-range\": {
-            \"max\": 41641,
-            \"min\": 41641
-        },
-        \"source-port-range\": null
-        }},
-        {
-        \"description\": \"Webmin Port\",
-        \"icmp-options\": null,
-        \"is-stateless\": false,
-        \"protocol\": \"6\",
-        \"source\": \"0.0.0.0/0\",
-        \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": {
-        \"destination-port-range\": {
-            \"max\": 10000,
-            \"min\": 10000
-        },
-        \"source-port-range\": null
-        },
-        \"udp-options\": null
-        },
-        {
-        \"description\": \"OpenVPN IPv4 UDP Port\",
-        \"icmp-options\": null,
-        \"is-stateless\": false,
-        \"protocol\": \"17\",
-        \"source\": \"0.0.0.0/0\",
-        \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": null,
-        \"udp-options\": {
-        \"destination-port-range\": {
-            \"max\": \"${VPN_PORT}\",
-            \"min\": \"${VPN_PORT}\"
-        },
-        \"source-port-range\": null
-        }
-        },
-        {
-        \"description\": \"OpenVPN IPv4 UDP Port\",
-        \"icmp-options\": null,
-        \"is-stateless\": false,
-        \"protocol\": \"17\",
-        \"source\": \"::/0\",
-        \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": null,
-        \"udp-options\": {
-        \"destination-port-range\": {
-            \"max\": \"${VPN_PORT}\",
-            \"min\": \"${VPN_PORT}\"
-        },
-        \"source-port-range\": null
-        }
-        },
-        {
-        \"description\": \"Temp Netcat TCP Port\",
-        \"icmp-options\": null,
-        \"is-stateless\": false,
-        \"protocol\": \"6\",
-        \"source\": \"0.0.0.0/0\",
-        \"source-type\": \"CIDR_BLOCK\",
-        \"tcp-options\": {
-        \"destination-port-range\": {
-            \"max\": \"${NC_PORT}\",
-            \"min\": \"${NC_PORT}\"
-        },
-        \"source-port-range\": null
-        },
-        \"udp-options\": null
-    }]" --force > /dev/null && \
-    printf "%s\n" "Ingress Security List Rules Updated" || printf "%s\n" "Failed to Update Ingress Security List Rules";
-};
+function update-security-list() {
+    CURRENT_INGRESS_RULES='/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"ingress-security-rules\"| [0]"';
+    CURRENT_EGRESS_RULES='/root/bin/oci network security-list list --compartment-id "$COMPARTMENT_ID" --vcn-id "$VCN_ID" --raw-output --query "data[].\"egress-security-rules\"| [0]"';
+
+    local security_list_id="$1"
+    local description="$2"
+    local icmp_options="$3"
+    local is_stateless="$4"
+    local protocol="$5"
+    local source_or_dest="$6"
+    local source_or_dest_type="$7"
+    local sport="$8"
+    local dport="$9"
+    local rule_type="${10}"
+    local proto=""
+    local sport_range=""
+    local BASE_RULES=""
+    local JSON_REQUEST=""
+    local tcp_port_options=""
+    local udp_port_options=""
+    local port_options=""
+
+    { [[ -n "$sport" ]] && sport_range="{\"max\": ${sport//\"/}, \"min\": ${sport//\"/}}" && \
+    JSON_REQUEST="$(echo "$JSON_REQUEST" | sed -e "s/\(\"source-port-range\":\s*\)\([^\",}]*\)/\1$sport_range/")"; } || \
+    { [[ -z "$sport" ]] && sport_range="null" && \
+    JSON_REQUEST="$(echo "$JSON_REQUEST" | sed -e "s/\(\"source-port-range\":\s*\)\([^\",}]*\)/\1$sport_range/")"; }
+
+    { [[ -n "$dport" ]] && dport_range="{\"max\": ${dport//\"/}, \"min\": ${dport//\"/}}" && \
+    JSON_REQUEST="$(echo "$JSON_REQUEST" | sed -e "s/\(\"source-port-range\":\s*\)\([^\",}]*\)/\1$dport_range/")"; } || \
+    { [[ -z "$dport" ]] && dport_range="null" && \
+    JSON_REQUEST="$(echo "$JSON_REQUEST" | sed -e "s/\(\"source-port-range\":\s*\)\([^\",}]*\)/\1$dport_range/")"; }
+
+    local port_options="{\"destination-port-range\": ${dport_range}, \"source-port-range\": ${sport_range}}"
+
+    { [[ "${protocol,,}" == "tcp" ]] && \
+    { [[ -n $dport ]] || [[ -n $sport ]];} && \
+    udp_port_options="null" && proto="6" && tcp_port_options=${port_options}; } || \
+    { [[ "${protocol,,}" == "all" ]] && proto="all" && udp_port_options="null" && tcp_port_options="null"; } || \
+    { [[ "${protocol,,}" == "udp" ]] && \
+    { [[ -n $dport ]] || [[ -n $sport ]];} && \
+    tcp_port_options="null" && proto="17" && udp_port_options=${port_options}; } || \
+    { printf "%s\n" "Check your Request, Something is wrong."; return 1; }
+
+    local JSON_REQUEST="{\"description\": \"$description\", \"destination\": \"$source_or_dest\", \"destination-type\": \"${source_or_dest_type:=CIDR_BLOCK}\", \"icmp-options\": ${icmp_options:="null"}, \"is-stateless\": $is_stateless, \"protocol\": \"$proto\", \"tcp-options\": $tcp_port_options, \"udp-options\": $udp_port_options}"
+    { [[ "${rule_type,,}" == "ingress" ]] && BASE_RULES="$(eval "${CURRENT_INGRESS_RULES}")" && JSON_REQUEST="${JSON_REQUEST/destination/source}" && JSON_REQUEST="${JSON_REQUEST/destination-type/source-type}"; } || \
+    { [[ "${rule_type,,}" == "egress" ]] && BASE_RULES="$(eval "${CURRENT_EGRESS_RULES}")"; } || \
+    { printf "%s\n" "Invalid Rule Type"; return 1; }
+
+    /root/bin/oci network security-list update --security-list-id "$security_list_id" --"${rule_type}"-security-rules "${BASE_RULES%\]},${JSON_REQUEST}]" > /dev/null --force && \
+    printf "%s: %s\n" "Security List Updated Successfully for ${rule_type^^}" "$description" || \
+    printf "%s: %s\n" "Failed to Update Security List for ${rule_type^^}" "$description"
+}
+
 function check-and-assign(){
     if [ -z "$(check-ipv6-subnet "$SUBNET_ID")" ]; then
         assign-ipv6-to-subnet "$SUBNET_ID" "$(get-ipv6-prefix "$VCN_ID")" && \
@@ -295,8 +251,12 @@ if [[ -z "${IPv6PREFIX}" ]]; then
     check-and-assign
 fi
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
-update-egress-security-list "$SECURITY_LIST_ID" "$CURRENT_EGRESS_RULES";
-update-ingress-security-list "$SECURITY_LIST_ID" "$CURRENT_INGRESS_RULES";
+update-security-list "$SECURITY_LIST_ID" "Allow Traffic for IPv6 ports" "null" "false" "all" "::/0" "CIDR_BLOCK" "" "" "egress"
+update-security-list "$SECURITY_LIST_ID" "Webmin Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "10000" "ingress"
+update-security-list "$SECURITY_LIST_ID" "Netcat Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "17486" "ingress"
+update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv4 Port" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
+update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv6 Port" "null" "false" "UDP" "::/0" "CIDR_BLOCK" "" "1194" "ingress"
+update-security-list "$SECURITY_LIST_ID" "Tailscale IPv4 Direct Connection" "null" "true" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
 dhclient -6 && ping6 -c 1 google.com
 fi # oci-cli check
 touch /root/.provisioned3 && printf "\n%s\n" "Part 3 completed successfully";
