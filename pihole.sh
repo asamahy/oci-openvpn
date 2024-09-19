@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2059,SC2086
+# shellcheck disable=SC2059,SC2086,SC2154
 
 # Install Pi-hole and Cloudflared
 

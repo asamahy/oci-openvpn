@@ -4,6 +4,7 @@
 ## Date: 2024-08-24
 ## Version: 1.0
 ## License: GPL-3.0
+# shellcheck disable=SC2086,SC2059,SC2016,SC2001
 set -e
 timedatectl set-timezone Universal
 
