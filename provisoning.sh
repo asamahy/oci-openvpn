@@ -21,8 +21,6 @@ export VPN_NET_IP="10.50.0.0";
 VPN_NET_MASK="255.255.255.0";
 export VPN_CIDR="24";
 VPN_PORT="1194";
-NC_PORT="17486";
-NC_PROTOCOL="tcp";
 VPN_PROTOCOL="udp";
 VPN_CIPHER="AES-256-CBC";
 HMAC_ALG="SHA512";
@@ -66,7 +64,6 @@ awk '{print $1}' | xargs -I {} iptables -D FORWARD {}
 iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4"
 add_iptables_rule 10000 tcp "Webmin"
 add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
-add_iptables_rule $NC_PORT $NC_PROTOCOL "Netcat"
 touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
 fi
 
@@ -254,7 +251,6 @@ fi
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
 update-security-list "$SECURITY_LIST_ID" "Allow Traffic for IPv6 ports" "null" "false" "all" "::/0" "CIDR_BLOCK" "" "" "egress"
 update-security-list "$SECURITY_LIST_ID" "Webmin Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "10000" "ingress"
-update-security-list "$SECURITY_LIST_ID" "Netcat Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "17486" "ingress"
 update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv4 Port" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
 update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv6 Port" "null" "false" "UDP" "::/0" "CIDR_BLOCK" "" "1194" "ingress"
 update-security-list "$SECURITY_LIST_ID" "Tailscale IPv4 Direct Connection" "null" "true" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
