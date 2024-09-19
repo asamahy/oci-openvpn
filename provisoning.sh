@@ -277,10 +277,10 @@ export KEY_ORG='My Org'
 export KEY_EMAIL='me@my.org'
 export KEY_OU='Cloud Lab'
 cp /usr/share/webmin/openvpn/openvpn-ssl.cnf /etc/openvpn/
-bash -c "sed \
+sed \
 -e 's/^\(database\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/index.txt/' \
 -e 's/^\(serial\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/serial/' \
-/etc/openvpn/openvpn-ssl.cnf > /etc/openvpn/openvpn-ssl-mod.cnf" > /dev/null
+/etc/openvpn/openvpn-ssl.cnf > /etc/openvpn/openvpn-ssl-mod.cnf
 
 mkdir -p ${KEY_DIR}/${CA_NAME} > /dev/null
 bash -c "cat << EOF > ${KEY_DIR}/${CA_NAME}/ca.config
@@ -303,8 +303,8 @@ EOF
 
 openssl dhparam -out "${KEY_DIR}/${CA_NAME}/dh${KEY_SIZE}.pem" "$KEY_SIZE" > /dev/null 2>&1 && \
 printf "%s\n" "Deffie-Hellman key created" || { printf "%s\n" "Failed to create Deffie-Hellman key" && exit 1; }
-bash -c "touch "${KEY_DIR}/${CA_NAME}/index.txt"" 
-bash -c "echo 01 > "${KEY_DIR}/${CA_NAME}/serial""
+touch "${KEY_DIR}/${CA_NAME}/index.txt"
+echo 01 > "${KEY_DIR}/${CA_NAME}/serial"
 
 /usr/bin/openssl req -batch -days 3650 -nodes -new -x509 \
 -keyout "${KEY_DIR}/${CA_NAME}/ca.key" \
@@ -316,8 +316,8 @@ bash -c "echo 01 > "${KEY_DIR}/${CA_NAME}/serial""
 -out "${KEY_DIR}/${CA_NAME}/crl.pem" \
 -config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null
 
-bash -c "cat ${KEY_DIR}/${CA_NAME}/ca.crt ${KEY_DIR}/${CA_NAME}/ca.key \
-> ${KEY_DIR}/${CA_NAME}/ca.pem" > /dev/null
+cat "${KEY_DIR}/${CA_NAME}"/ca.crt "${KEY_DIR}/${CA_NAME}"/ca.key \
+> "${KEY_DIR}/${CA_NAME}"/ca.pem
 
 export KEY_CN="${KEY_CN}_server"
 
@@ -434,11 +434,11 @@ ${TLS_CRYPT_V2_CLIENT_KEY}
 </tls-crypt-v2>
 EOF
 "
-bash -c "sed \
+sed \
 -e '/^\(user root\)/d' \
 -e '/^\(group root\)/d' \
-/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf \
-> /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn"
+"/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf" \
+> "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn"
 
 touch /root/.provisioned4 && printf "\n%s\n" "Part 4 Done. OpenVPN Server Configuration Completed successfully";
 fi
