@@ -8,6 +8,7 @@
 set -e
 timedatectl set-timezone Universal
 
+INSTALL_WEBMIN="false";
 INSTANCE_NAME="CHANGE_ME";
 CHANGE_PASSWORDS="true";
 UBUNTU_PASSWORD="CHANGE_ME";
@@ -53,17 +54,19 @@ sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
 update_openssl_conf "/etc/ssl/openssl.cnf"
-bash -c "$(curl -sSL  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force
-apt-get install webmin --install-recommends -y
-update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
-curl -sSL -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
-/usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
+if [ "$INSTALL_WEBMIN" == "true" ]; then
+    bash -c "$(curl -sSL  https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh)" -- --force
+    apt-get install webmin --install-recommends -y
+    update_openssl_conf "/usr/share/webmin/acl/openssl.cnf"
+    curl -sSL -o openvpn.wbm.gz https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz
+    /usr/share/webmin/install-module.pl openvpn.wbm.gz && rm -f openvpn.wbm.gz
+    add_iptables_rule 10000 tcp "Webmin"
+fi
 rule_number=$(iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 iptables -L FORWARD --line-numbers | \
 grep -E 'reject-with.*icmp-host-prohibited' | \
 awk '{print $1}' | xargs -I {} iptables -D FORWARD {}
 iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4"
-add_iptables_rule 10000 tcp "Webmin"
 add_iptables_rule $VPN_PORT $VPN_PROTOCOL "OpenVPN"
 touch /root/.provisioned1 && printf "\n%s\n" "Part 1 completed successfully";
 fi
@@ -251,7 +254,7 @@ if [[ -z "${IPv6PREFIX}" ]]; then
 fi
 add-ipv4-ipv6-internet-route "$ROUTE_TABLE_ID" "$INTERNET_GATEWAY_ID";
 update-security-list "$SECURITY_LIST_ID" "Allow Traffic for IPv6 ports" "null" "false" "all" "::/0" "CIDR_BLOCK" "" "" "egress"
-update-security-list "$SECURITY_LIST_ID" "Webmin Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "10000" "ingress"
+[[ "$INSTALL_WEBMIN" == "true" ]] && update-security-list "$SECURITY_LIST_ID" "Webmin Port" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "10000" "ingress"
 update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv4 Port" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
 update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv6 Port" "null" "false" "UDP" "::/0" "CIDR_BLOCK" "" "1194" "ingress"
 update-security-list "$SECURITY_LIST_ID" "Tailscale IPv4 Direct Connection" "null" "true" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "1194" "ingress"
@@ -276,7 +279,8 @@ export KEY_CITY='Marseille'
 export KEY_ORG='My Org'
 export KEY_EMAIL='me@my.org'
 export KEY_OU='Cloud Lab'
-cp /usr/share/webmin/openvpn/openvpn-ssl.cnf /etc/openvpn/
+[[ "$INSTALL_WEBMIN" == "true" ]] && cp /usr/share/webmin/openvpn/openvpn-ssl.cnf /etc/openvpn/ || \
+curl -sSL https://github.com/asamahy/webmin-openvpn-debian-jessie/raw/master/openvpn.wbm.gz | tar zxvf - "openvpn/openvpn-ssl.cnf" -O > /etc/openvpn/openvpn-ssl.cnf 2> /dev/null
 sed \
 -e 's/^\(database\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/index.txt/' \
 -e 's/^\(serial\s*=\s*\)[^#[:space:]]*/\1\$dir\/\$ENV::CA_NAME\/serial/' \
@@ -407,6 +411,9 @@ printf "%s\n" "Creating the tls-crypt-v2 key for the client"
 /usr/sbin/openvpn --tls-crypt-v2 /etc/openvpn/tls-crypt-v2.key \
 --genkey tls-crypt-v2-client /etc/openvpn/tls-crypt-v2-client.key > /dev/null
 TLS_CRYPT_V2_CLIENT_KEY=$(</etc/openvpn/tls-crypt-v2-client.key)
+CA=$(<"/etc/openvpn/keys/${CA_NAME}/ca.crt")
+CLIENT_CERT=$(<"/etc/openvpn/keys/${CA_NAME}/${KEY_CN}_client.crt")
+CLIENT_KEY=$(<"/etc/openvpn/keys/${CA_NAME}/${KEY_CN}_client.key")
 
 bash -c "cat << EOF > /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf
 client
@@ -439,6 +446,29 @@ sed \
 -e '/^\(group root\)/d' \
 "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf" \
 > "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn"
+# either remove the indentation or use the sed 's/^[ \t]*//' to remove the leading whitespace from the here-doc input (<<<)
+if [[ "$INSTALL_WEBMIN" != "true" ]];then
+    sed -e '/^\(ca ca.crt\)/ {
+    r /dev/stdin
+    d
+    }' \
+    -e '/^\(cert\)/d' \
+    -e '/^\(key\)/d' \
+    "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.ovpn" <<< "$(echo "<ca>
+    ${CA}
+    </ca>
+    <cert>
+    ${CLIENT_CERT}
+    </cert>
+    <key>
+    ${CLIENT_KEY}
+    </key>" | sed 's/^[ \t]*//')" > /home/ubuntu/Client_CloudVPN.ovpn
+    chown ubuntu:ubuntu /home/ubuntu/Client_CloudVPN.ovpn
+    systemctl enable openvpn@${KEY_CN}.service
+    systemctl start openvpn@${KEY_CN}.service
+    systemctl status openvpn@${KEY_CN}.service > /dev/null
+    printf "%s\n" "OpenVPN Server Started Successfully" || printf "%s\n" "Failed to start OpenVPN Server";
+fi
 
 touch /root/.provisioned4 && printf "\n%s\n" "Part 4 Done. OpenVPN Server Configuration Completed successfully";
 fi
@@ -458,7 +488,7 @@ fi
 fi
     if [ -f /root/.provisioned1 ] && [ -f /root/.provisioned2 ] && [ -f /root/.provisioned3 ] && [ -f /root/.provisioned4 ] && [ -f /root/.provisioned5 ]; then
         printf "%s\n" "All parts have been completed successfully"
-        printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
+        [[ "$INSTALL_WEBMIN" == "true" ]] && printf "%s\n" "Webmin portal is available @ https://${VPN_SERVER_IP}:10000"
     fi
 export rule_number
 export -f add_iptables_rule
