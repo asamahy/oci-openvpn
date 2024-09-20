@@ -11,6 +11,7 @@ set -e
 if [[ -f /root/.pihole ]]; then
     printf "%s\n" "Pi-hole has been installed before, skipping..."
     else
+    { [[ "$INSTALL_CLOUDFLARED" != "true" ]] && [[ "$INSTALL_UNBOUND" != "true" ]] && DNS_SERVER="1.1.1.1"; } || DNS_SERVER="127.0.0.1";
     { [[ "$INSTALL_CLOUDFLARED" == "true" ]] && DNS_PORT='5053'; } || { [[ "$INSTALL_UNBOUND" == "true" ]] && DNS_PORT='5335'; } || DNS_PORT='53';
     pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
     mkdir -p /etc/pihole
@@ -28,7 +29,7 @@ WEBPASSWORD=$(printf ${pass})
 BLOCKING_ENABLED=true
 DNSSEC=false
 REV_SERVER=false
-PIHOLE_DNS_1=127.0.0.1#${DNS_PORT}
+PIHOLE_DNS_1=${DNS_SERVER}#${DNS_PORT}
 PIHOLE_DNS_2=::1#5335
 EOF
 "
