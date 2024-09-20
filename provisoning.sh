@@ -241,8 +241,6 @@ if [[ -f /root/.ipv6 ]]; then
 fi
 
 ##############
-# Export Generated Variables and Functions
-##############
 export rule_number;
 export SECURITY_LIST_ID;
 export COMPARTMENT_ID;
@@ -255,27 +253,11 @@ export -f update_openssl_conf;
 export -f get-ipv4-subnet;
 export -f get-ipv6-prefix;
 ###############
-# Install Webmin
-###############
 [[ "$INSTALL_WEBMIN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/webmin.sh)"
-###############
-# Install OpenVPN
-###############
 [[ "$INSTALL_OPENVPN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/openvpn.sh)"
-###############
-# Install Pi-hole
-###############
 [[ "$INSTALL_PIHOLE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/pihole.sh)"
-###############
-# Install Cloudflared
-###############
 [[ "$INSTALL_CLOUDFLARED" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/cloudflared.sh)"
-###############
-# Install Unbound
-###############
 [[ "$INSTALL_UNBOUND" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/unbound.sh)"
-###############
-# Install Tailscale
 [[ "$INSTALL_TAILSCALE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/tailscale.sh)"
 ###############
 
