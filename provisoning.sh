@@ -14,6 +14,7 @@ export INSTALL_OPENVPN="true";
 export INSTALL_PIHOLE="true";
 export INSTALL_CLOUDFLARED="false";
 export INSTALL_UNBOUND="true";
+export INSTALL_TAILSCALE="true";
 
 INSTANCE_NAME="CHANGE_ME";
 CHANGE_PASSWORDS="true";
@@ -31,6 +32,7 @@ export VPN_PORT="1194";
 export VPN_PROTOCOL="udp";
 export VPN_CIPHER="AES-256-CBC";
 export HMAC_ALG="SHA512";
+export TAILSCALE_AUTH_KEY="CHANGE_ME";
 rule_number=$(iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')
 
 # Common Functions
@@ -49,6 +51,9 @@ function add_iptables_rule() {
     printf "%s\n" "$description rule added" || printf "%s\n" "Failed to add $description rule"
     sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
     printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
+};
+function get-ipv4-subnet(){
+    /root/bin/oci network subnet get --subnet-id "$1" --raw-output --query "data.\"cidr-block\""
 };
 function get-ipv6-prefix(){
     /root/bin/oci network vcn get --vcn-id "$1" --raw-output --query "data.\"ipv6-cidr-blocks\" | [0]";
@@ -247,6 +252,7 @@ export INSTANCE_IPv4
 export -f add_iptables_rule;
 export -f update-security-list;
 export -f update_openssl_conf;
+export -f get-ipv4-subnet;
 export -f get-ipv6-prefix;
 ###############
 # Install Webmin
@@ -268,6 +274,9 @@ export -f get-ipv6-prefix;
 # Install Unbound
 ###############
 [[ "$INSTALL_UNBOUND" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/unbound.sh)"
+###############
+# Install Tailscale
+[[ "$INSTALL_TAILSCALE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/tailscale.sh)"
 ###############
 
 if [[ "$CHANGE_PASSWORDS" == "true" ]]; then    
