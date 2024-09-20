@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 # Install Tailscale
 # https://tailscale.com/kb/1293/cloud-init
+# required variables:
+# - TAILSCALE_AUTH_KEY
+# - SUBNET_ID
+# - rule_number
+# - SECURITY_LIST_ID
+# - COMPARTMENT_ID
+# - VCN_ID
+# required functions:
+# - get-ipv4-subnet
+# - add_iptables_rule
+# - update-security-list
+
 set -e
 if [[ -f /root/.tailscale ]]; then
     printf "%s\n" "Tailscale has been installed before, skipping..."

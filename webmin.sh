@@ -5,6 +5,17 @@
 ## Version: 1.0
 ## License: GPL-3.0
 # Install Webmin
+# Required variables:
+# - rule_number
+# - SECURITY_LIST_ID
+# - COMPARTMENT_ID
+# - VCN_ID
+# - VPN_SERVER_IP
+# required functions:
+# - update_openssl_conf
+# - add_iptables_rule
+# - update-security-list
+#
 set -e
 if [[ -f /root/.webmin ]]; then
     printf "%s\n" "Webmin has been installed before, skipping..."

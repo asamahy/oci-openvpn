@@ -7,6 +7,21 @@
 # shellcheck disable=SC2059,SC2086,SC2154
 
 # Install Pi-hole
+# Required variables:
+# - PI_HOLE_PASSWORD
+# - INSTALL_CLOUDFLARED
+# - INSTALL_UNBOUND
+# - VPN_NET_IP
+# - VPN_CIDR
+# - INSTANCE_IPv4
+# - rule_number
+# - SECURITY_LIST_ID
+# - COMPARTMENT_ID
+# - VCN_ID
+# required functions:
+# - add_iptables_rule
+# - update-security-list
+#
 set -e
 if [[ -f /root/.pihole ]]; then
     printf "%s\n" "Pi-hole has been installed before, skipping..."

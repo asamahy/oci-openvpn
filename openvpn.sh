@@ -7,6 +7,26 @@
 # shellcheck disable=SC2016,SC2154
 
 # Install OpenVPN
+# Required variables:
+# - VPN_NET_IP
+# - VPN_CIDR
+# - INSTANCE_IPv4
+# - rule_number
+# - VPN_PORT
+# - VPN_PROTOCOL
+# - SECURITY_LIST_ID
+# - COMPARTMENT_ID
+# - VCN_ID
+# - INSTALL_WEBMIN
+# - VPN_CIPHER
+# - HMAC_ALG
+# - DNS_SERVER_1
+# required functions:
+# - update_openssl_conf
+# - add_iptables_rule
+# - update-security-list
+# - get-ipv6-prefix
+#
 set -e
 if [[ -f /root/.openvpn ]]; then
     printf "%s\n" "OpenVPN has been installed before, skipping..."
