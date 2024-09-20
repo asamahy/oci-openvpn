@@ -253,11 +253,11 @@ export -f update_openssl_conf;
 export -f get-ipv4-subnet;
 export -f get-ipv6-prefix;
 ###############
-[[ "$INSTALL_WEBMIN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/webmin.sh)"
-[[ "$INSTALL_OPENVPN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/openvpn.sh)"
-[[ "$INSTALL_PIHOLE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/pihole.sh)"
-[[ "$INSTALL_CLOUDFLARED" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/cloudflared.sh)"
-[[ "$INSTALL_UNBOUND" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/refactored/unbound.sh)"
+[[ "$INSTALL_WEBMIN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/webmin.sh)"
+[[ "$INSTALL_OPENVPN" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/openvpn.sh)"
+[[ "$INSTALL_PIHOLE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/pihole.sh)"
+[[ "$INSTALL_CLOUDFLARED" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/cloudflared.sh)"
+[[ "$INSTALL_UNBOUND" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/unbound.sh)"
 [[ "$INSTALL_TAILSCALE" == "true" ]] && bash -c "$(curl -sSL https://github.com/asamahy/oci-openvpn/raw/main/tailscale.sh)"
 ###############
 
