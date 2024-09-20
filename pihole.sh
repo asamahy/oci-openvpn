@@ -174,8 +174,6 @@ private-address: fd00::/8
 private-address: fe80::/10
 EOF
 
-sudo service unbound restart
-
 echo 'edns-packet-max=1232' > /etc/dnsmasq.d/99-edns.conf
 sudo systemctl disable --now unbound-resolvconf.service
 

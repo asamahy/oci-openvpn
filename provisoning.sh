@@ -465,7 +465,6 @@ if [[ "$INSTALL_WEBMIN" != "true" ]];then
     </key>" | sed 's/^[ \t]*//')" > /home/ubuntu/Client_CloudVPN.ovpn
     chown ubuntu:ubuntu /home/ubuntu/Client_CloudVPN.ovpn
     systemctl enable openvpn@${KEY_CN}.service
-    systemctl start openvpn@${KEY_CN}.service
     systemctl status openvpn@${KEY_CN}.service > /dev/null
     printf "%s\n" "OpenVPN Server Started Successfully" || printf "%s\n" "Failed to start OpenVPN Server";
 fi
