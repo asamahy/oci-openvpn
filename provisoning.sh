@@ -247,6 +247,7 @@ export COMPARTMENT_ID;
 export VCN_ID;
 export VPN_SERVER_IP;
 export INSTANCE_IPv4
+export SUBNET_ID;
 export -f add_iptables_rule;
 export -f update-security-list;
 export -f update_openssl_conf;
