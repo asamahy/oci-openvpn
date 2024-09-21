@@ -11,7 +11,9 @@ if [[ -f /root/.unbound ]]; then
     else
 printf "%s\n" "Installing Unbound"
 apt-get -qqy install unbound
+
 mkdir -p /etc/unbound/unbound.conf.d/
+
 bash -c "cat << EOF > /etc/unbound/unbound.conf.d/pi-hole.conf
 server:
 # If no logfile is specified, syslog is used

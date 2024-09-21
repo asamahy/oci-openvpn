@@ -16,12 +16,15 @@ printf "%s\n" "Cloudflared installed" || printf "%s\n" "Failed to install Cloudf
 rm -f cloudflared-linux-amd64.deb
 cloudflared -v
 useradd -s /usr/sbin/nologin -r -M cloudflared
+
 cat << EOF > /etc/default/cloudflared
 # Commandline args for cloudflared, using Cloudflare DNS
 CLOUDFLARED_OPTS=--port 5053 --upstream https://1.1.1.1/dns-query --upstream https://1.0.0.1/dns-query
 EOF
+
 chown cloudflared:cloudflared /etc/default/cloudflared
 chown cloudflared:cloudflared /usr/local/bin/cloudflared
+
 bash -c "cat << EOF > /etc/systemd/system/cloudflared.service
 [Unit]
 Description=cloudflared DNS over HTTPS proxy
@@ -41,10 +44,12 @@ WantedBy=multi-user.target
 EOF
 " && \
 printf "%s\n" "Cloudflared service file created" || printf "%s\n" "Failed to create Cloudflared service file"
+
 systemctl enable cloudflared
 systemctl start cloudflared
 systemctl status cloudflared > /dev/null && \
 printf "%s\n" "Cloudflared service installed and enabled" || printf "%s\n" "Failed to install Cloudflared service"
+
 bash -c ' cat << EOF > /etc/cron.weekly/cloudflared-updater
 #!/usr/bin/env bash
 set -e
@@ -57,6 +62,7 @@ cloudflared -v
 systemctl status cloudflared
 EOF
 '
+
 chmod +x /etc/cron.weekly/cloudflared-updater
 chown root:root /etc/cron.weekly/cloudflared-updater
 touch /root/.cloudflared && printf "\n%s\n" "Cloudflared installation completed successfully";

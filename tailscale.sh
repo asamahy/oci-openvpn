@@ -25,7 +25,7 @@ sed -i \
 sysctl -p > /dev/null
 sh -c "$(curl -sSL https://tailscale.com/install.sh)"
 [[ -n "${TAILSCALE_AUTH_KEY}" ]] && \
-tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --advertise-routes="$(get-ipv4-subnet "$SUBNET_ID"),169.254.169.254/32" --accept-dns=false;
+tailscale up --ssh --authkey="${TAILSCALE_AUTH_KEY}" --advertise-routes="$(get-ipv4-subnet "$SUBNET_ID"),169.254.169.254/32" --accept-dns=false;
 add_iptables_rule "$NETDEV" 41641 udp "Tailscale IPv4 Direct Connection"
 update-security-list "$SECURITY_LIST_ID" "Tailscale IPv4 Direct Connection" "null" "true" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "41641" "ingress"
 [[ -f /etc/networkd-dispatcher/routable.d/60-openvpn ]] || \
