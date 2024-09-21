@@ -209,7 +209,7 @@ chmod 600 /root/.oci/config
 [[ "$INSTANCE_NAME" == "CHANGE_ME" ]] && printf "%s\n" "INSTANCE_NAME is set to script default, Exiting..." && exit 1
 
 printf "%s\n" "Part 1: System Update and Tools Installation"
-apt-get update -qq && apt-get upgrade -qqy 
+apt-get update -qq && apt-get dist-upgrade -qqy 
 apt-get install net-tools nano apt-utils dialog iputils-ping dnsutils cron -qqy
 if [[ -f /root/.oci_installed ]]; then
     printf "%s\n" "OCI CLI has been installed before, skipping..."
