@@ -13,7 +13,7 @@
 # - INSTALL_UNBOUND
 # - VPN_NET_IP
 # - VPN_CIDR
-# - INSTANCE_IPv4
+# - PRIVATE_IPv4
 # - rule_number
 # - NETDEV
 # - SECURITY_LIST_ID
@@ -29,8 +29,10 @@ if [[ -f /root/.pihole ]]; then
     else
     { [[ "$INSTALL_CLOUDFLARED" != "true" ]] && [[ "$INSTALL_UNBOUND" != "true" ]] && DNS_SERVER="1.1.1.1"; } || DNS_SERVER="127.0.0.1";
     { [[ "$INSTALL_CLOUDFLARED" == "true" ]] && DNS_PORT='5053'; } || { [[ "$INSTALL_UNBOUND" == "true" ]] && DNS_PORT='5335'; } || DNS_PORT='53';
-    pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
-    mkdir -p /etc/pihole
+
+pass=$(printf "$PI_HOLE_PASSWORD" | sha256sum | awk '{printf $1}'|sha256sum);
+
+mkdir -p /etc/pihole
 bash -c "cat << EOF > /etc/pihole/setupVars.conf
 PIHOLE_INTERFACE=${NETDEV}
 QUERY_LOGGING=true
@@ -49,12 +51,13 @@ PIHOLE_DNS_1=${DNS_SERVER}#${DNS_PORT}
 PIHOLE_DNS_2=::1#5335
 EOF
 "
-    curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
-    rule_number="$(sudo iptables -L INPUT --line-numbers | grep -E 'ACCEPT.*dpt:ssh' | awk '{print $1}')"
-    iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$INSTANCE_IPv4" -j ACCEPT
-    add_iptables_rule "$NETDEV" 53 udp "PI-Hole DNS UDP"
-    add_iptables_rule "$NETDEV" 53 tcp "PI-Hole DNS TCP"
-    update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
-    update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
-    touch /root/.pihole && printf "\n%s\n" "Pi-hole installation completed successfully";
+
+curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
+
+iptables -I INPUT $((++rule_number)) -i tun0 -s "${VPN_NET_IP}/${VPN_CIDR}" -d "$PRIVATE_IPv4" -j ACCEPT
+add_iptables_rule "$NETDEV" 53 udp "PI-Hole DNS UDP"
+add_iptables_rule "$NETDEV" 53 tcp "PI-Hole DNS TCP"
+update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "UDP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
+update-security-list "$SECURITY_LIST_ID" "Pi-Hole DNS" "null" "false" "TCP" "0.0.0.0/0" "CIDR_BLOCK" "" "53" "ingress"
+touch /root/.pihole && printf "\n%s\n" "Pi-hole installation completed successfully";
 fi

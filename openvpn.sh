@@ -10,7 +10,7 @@
 # Required variables:
 # - VPN_NET_IP
 # - VPN_CIDR
-# - INSTANCE_IPv4
+# - PRIVATE_IPv4
 # - rule_number
 # - NETDEV
 # - VPN_PORT
@@ -47,7 +47,7 @@ iptables -L FORWARD --line-numbers | \
 grep -E 'reject-with.*icmp-host-prohibited' | \
 awk '{print $1}' | xargs -I {} iptables -D FORWARD {} && \
 printf "%s\n" "Removed the default FORWARD rule" || printf "%s\n" "No default FORWARD rule found"
-iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o "$NETDEV" -j SNAT --to-source "$INSTANCE_IPv4" && \
+iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o "$NETDEV" -j SNAT --to-source "$PRIVATE_IPv4" && \
 printf "%s\n" "Added the SNAT rule" || printf "%s\n" "Failed to add the SNAT rule"
 add_iptables_rule "$NETDEV" "$VPN_PORT" "$VPN_PROTOCOL" "OpenVPN"
 
@@ -92,39 +92,50 @@ KEY_CN=>'${KEY_CN}',
 }
 EOF
 " > /dev/null
+
 printf "%s\n" "Creating the Deffie-Hellman key"
 openssl dhparam -out "${KEY_DIR}/${CA_NAME}/dh${KEY_SIZE}.pem" "$KEY_SIZE" > /dev/null 2>&1 && \
 printf "%s\n" "Deffie-Hellman key created" || { printf "%s\n" "Failed to create Deffie-Hellman key" && exit 1; }
 touch "${KEY_DIR}/${CA_NAME}/index.txt"
 echo 01 > "${KEY_DIR}/${CA_NAME}/serial"
 
+printf "%s\n" "Creating the CA certificate"
 /usr/bin/openssl req -batch -days 3650 -nodes -new -x509 \
 -keyout "${KEY_DIR}/${CA_NAME}/ca.key" \
 -out "${KEY_DIR}/${CA_NAME}/ca.crt" \
--config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "CA certificate created" || { printf "%s\n" "Failed to create CA certificate" && exit 1; }
+
+printf "%s\n" "Creating the CRL"
 /usr/bin/openssl ca -gencrl \
 -keyfile "${KEY_DIR}/${CA_NAME}/ca.key" \
 -cert "${KEY_DIR}/${CA_NAME}/ca.crt" \
 -out "${KEY_DIR}/${CA_NAME}/crl.pem" \
--config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null 2>&1 && \
+printf "%s\n" "CRL created" || { printf "%s\n" "Failed to create CRL" && exit 1; }
 
 cat "${KEY_DIR}/${CA_NAME}"/ca.crt "${KEY_DIR}/${CA_NAME}"/ca.key \
 > "${KEY_DIR}/${CA_NAME}"/ca.pem
 
 export KEY_CN="${KEY_CN}_server"
 
+printf "%s\n" "Creating the server certificate"
 openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
 -keyout "$KEY_DIR/${CA_NAME}/${KEY_CN}.key" \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -extensions server \
--config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Server certificate created" || { printf "%s\n" "Failed to create Server certificate" && exit 1; }
+
+printf "%s\n" "Signing the server certificate"
 openssl ca -days 3650 -batch \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
 -in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -keyfile "$KEY_DIR/${CA_NAME}/ca.key" \
 -cert "$KEY_DIR/${CA_NAME}/ca.crt" \
 -extensions server \
--config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Server certificate signed" || { printf "%s\n" "Failed to sign Server certificate" && exit 1; }
 
 mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/ > /dev/null 
 bash -c "echo -e 'Do not remove this file. It will be used from webmin OpenVPN Administration interface.' \
@@ -132,22 +143,28 @@ bash -c "echo -e 'Do not remove this file. It will be used from webmin OpenVPN A
 
 export KEY_CN="${KEY_CN%_server}_client"
 
+printf "%s\n" "Creating the client certificate"
 openssl req -newkey rsa:"${KEY_SIZE}" -days 3650 -batch -nodes \
 -keyout "$KEY_DIR/${CA_NAME}/${KEY_CN}.key" \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
--config /etc/openvpn/openvpn-ssl.cnf > /dev/null
+-config /etc/openvpn/openvpn-ssl.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Client certificate created" || { printf "%s\n" "Failed to create Client certificate" && exit 1; }
+
+printf "%s\n" "Signing the client certificate"
 openssl ca -days 3650 -batch \
 -out "$KEY_DIR/${CA_NAME}/${KEY_CN}.crt" \
 -in "$KEY_DIR/${CA_NAME}/${KEY_CN}.csr" \
 -keyfile "$KEY_DIR/${CA_NAME}/ca.key" \
 -cert "$KEY_DIR/${CA_NAME}/ca.crt" \
--config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null 2>&1
+-config /etc/openvpn/openvpn-ssl-mod.cnf > /dev/null 2>&1 && \
+printf "%s\n" "Client certificate signed" || { printf "%s\n" "Failed to sign Client certificate" && exit 1; }
 
 mv "$KEY_DIR"/*.pem "$KEY_DIR/${CA_NAME}"/
 
 export KEY_CN="${KEY_CN%_client}"
 
 IPv6PREFIX=$(get-ipv6-prefix "$VCN_ID");
+printf "%s\n" "Creating the OpenVPN server configuration file"
 bash -c "cat << EOF > /etc/openvpn/${KEY_CN}.conf
 port ${VPN_PORT}
 proto ${VPN_PROTOCOL}
@@ -193,9 +210,10 @@ touch "/etc/openvpn/servers/${KEY_CN}/ccd/${KEY_CN}_client" \
 
 cp "$KEY_DIR/$CA_NAME"/{ca.crt,"${KEY_CN}"_client.crt,"${KEY_CN}"_client.key} \
 "/etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/"
-printf "%s\n" "Creating the tls-crypt-v2 key"
+printf "%s\n" "Generating the tls-crypt-v2 key"
 /usr/sbin/openvpn --genkey tls-crypt-v2-server /etc/openvpn/tls-crypt-v2.key > /dev/null
-printf "%s\n" "Creating the tls-crypt-v2 key for the client"
+
+printf "%s\n" "Generating the tls-crypt-v2 key for the client"
 /usr/sbin/openvpn --tls-crypt-v2 /etc/openvpn/tls-crypt-v2.key \
 --genkey tls-crypt-v2-client /etc/openvpn/tls-crypt-v2-client.key > /dev/null
 
@@ -204,6 +222,7 @@ CA=$(<"/etc/openvpn/keys/${CA_NAME}/ca.crt")
 CLIENT_CERT=$(<"/etc/openvpn/keys/${CA_NAME}/${KEY_CN}_client.crt")
 CLIENT_KEY=$(<"/etc/openvpn/keys/${CA_NAME}/${KEY_CN}_client.key")
 
+printf "%s\n" "Creating the client configuration file and ovpn file"
 bash -c "cat << EOF > /etc/openvpn/clients/${KEY_CN}/${KEY_CN}_client/${KEY_CN}_client.conf
 client
 proto ${VPN_PROTOCOL}
