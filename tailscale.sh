@@ -18,6 +18,10 @@ if [[ -f /root/.tailscale ]]; then
     printf "%s\n" "Tailscale has been installed before, skipping..."
     else
 printf "%s\n" "Installing Tailscale"
+sed -i \
+-e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
+-e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
+sysctl -p > /dev/null
 sh -c "$(curl -sSL https://tailscale.com/install.sh)"
 [[ -n "${TAILSCALE_AUTH_KEY}" ]] && \
 tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --advertise-routes="$(get-ipv4-subnet "$SUBNET_ID"),169.254.169.254/32" --accept-dns=false;

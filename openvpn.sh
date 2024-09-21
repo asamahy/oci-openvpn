@@ -38,6 +38,7 @@ openssl rand -writerand /root/.rnd -out /dev/null
 sed -i \
 -e 's/^#\(net.ipv4.ip_forward=\)\([0-1]\)/\11/' \
 -e 's/^#\(net.ipv6.conf.all.forwarding=\)\([0-1]\)/\11/' /etc/sysctl.conf
+sysctl -p > /dev/null
 
 update_openssl_conf "/etc/ssl/openssl.cnf"
 
