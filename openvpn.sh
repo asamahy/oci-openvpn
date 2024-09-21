@@ -12,6 +12,7 @@
 # - VPN_CIDR
 # - INSTANCE_IPv4
 # - rule_number
+# - NETDEV
 # - VPN_PORT
 # - VPN_PROTOCOL
 # - SECURITY_LIST_ID
@@ -46,9 +47,9 @@ iptables -L FORWARD --line-numbers | \
 grep -E 'reject-with.*icmp-host-prohibited' | \
 awk '{print $1}' | xargs -I {} iptables -D FORWARD {} && \
 printf "%s\n" "Removed the default FORWARD rule" || printf "%s\n" "No default FORWARD rule found"
-iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o ens3 -j SNAT --to-source "$INSTANCE_IPv4" && \
+iptables -t nat -A POSTROUTING -s "${VPN_NET_IP}/${VPN_CIDR}" -o "$NETDEV" -j SNAT --to-source "$INSTANCE_IPv4" && \
 printf "%s\n" "Added the SNAT rule" || printf "%s\n" "Failed to add the SNAT rule"
-add_iptables_rule "$VPN_PORT" "$VPN_PROTOCOL" "OpenVPN"
+add_iptables_rule "$NETDEV" "$VPN_PORT" "$VPN_PROTOCOL" "OpenVPN"
 
 
 update-security-list "$SECURITY_LIST_ID" "OpenVPN UDP IPv4 Port" "null" "false" "$VPN_PROTOCOL" "0.0.0.0/0" "CIDR_BLOCK" "" "$VPN_PORT" "ingress"
@@ -257,7 +258,7 @@ systemctl enable openvpn@"${KEY_CN}".service
 systemctl start openvpn@"${KEY_CN}".service > /dev/null && \
 printf "%s\n" "OpenVPN Server Started Successfully" || printf "%s\n" "Failed to start OpenVPN Server";
 [[ -f /etc/networkd-dispatcher/routable.d/50-tailscale ]] || \
-{ printf '#!/bin/sh\n\nethtool -K %s rx-udp-gro-forwarding on rx-gro-list off \n' "$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")" > /etc/networkd-dispatcher/routable.d/60-openvpn && \
+{ printf '#!/bin/sh\n\nethtool -K %s rx-udp-gro-forwarding on rx-gro-list off \n' "$NETDEV" > /etc/networkd-dispatcher/routable.d/60-openvpn && \
 sudo chmod 755 /etc/networkd-dispatcher/routable.d/50-tailscale; }
 touch /root/.openvpn && printf "\n%s\n" "OpenVPN installation completed successfully";
 fi

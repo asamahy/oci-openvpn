@@ -22,6 +22,7 @@ UBUNTU_PASSWORD="CHANGE_ME";
 ROOT_PASSWORD="CHANGE_ME";
 export PI_HOLE_PASSWORD="CHANGE_ME";
 route=$(ip route get 8.8.8.8)
+NETDEV=$(echo $route | cut -f 5 -d " ")
 INSTANCE_IPv4="$(printf ${route#*src })";
 VPN_SERVER_IP="$(curl -s -4 ifconfig.io)"; # change to domain name if you have one
 export DNS_SERVER_1="$INSTANCE_IPv4"
@@ -44,10 +45,11 @@ function update_openssl_conf() {
     -e 's/^\(default_md\s*=\s*\)[^#[:space:]]*/\1sha512/' "$conf_file"
 };
 function add_iptables_rule() {
-    local port=$1
-    local protocol=$2
-    local description=$3
-    iptables -I INPUT $((++rule_number)) -p "$protocol" -m conntrack --ctstate NEW --dport "$port" -j ACCEPT && \
+    local interface=$1
+    local port=$2
+    local protocol=$3
+    local description=$4
+    iptables -I INPUT $((++rule_number)) -i "$interface" -p "$protocol" -m conntrack --ctstate NEW --dport "$port" -j ACCEPT && \
     printf "%s\n" "$description rule added" || printf "%s\n" "Failed to add $description rule"
     sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
     printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
@@ -248,6 +250,7 @@ export VCN_ID;
 export VPN_SERVER_IP;
 export INSTANCE_IPv4
 export SUBNET_ID;
+export NETDEV;
 export -f add_iptables_rule;
 export -f update-security-list;
 export -f update_openssl_conf;
