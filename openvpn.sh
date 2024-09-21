@@ -256,5 +256,8 @@ fi
 systemctl enable openvpn@"${KEY_CN}".service
 systemctl start openvpn@"${KEY_CN}".service > /dev/null && \
 printf "%s\n" "OpenVPN Server Started Successfully" || printf "%s\n" "Failed to start OpenVPN Server";
+[[ -f /etc/networkd-dispatcher/routable.d/50-tailscale ]] || \
+{ printf '#!/bin/sh\n\nethtool -K %s rx-udp-gro-forwarding on rx-gro-list off \n' "$(ip -o route get 8.8.8.8 | cut -f 5 -d " ")" > /etc/networkd-dispatcher/routable.d/60-openvpn && \
+sudo chmod 755 /etc/networkd-dispatcher/routable.d/50-tailscale; }
 touch /root/.openvpn && printf "\n%s\n" "OpenVPN installation completed successfully";
 fi
