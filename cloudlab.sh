@@ -32,7 +32,7 @@ function add_iptables_rule() {
     local description=$4
     iptables -I INPUT $((++rule_number)) -i "$interface" -p "$protocol" -m conntrack --ctstate NEW --dport "$port" -j ACCEPT && \
     printf "%s\n" "$description rule added" || printf "%s\n" "Failed to add $description rule"
-    sh -c 'iptables-save > /etc/iptables/rules.v4' && sh -c 'iptables-restore < /etc/iptables/rules.v4' && \
+    sh -c 'iptables-save > /etc/iptables/rules.v4.bak' && sh -c 'netfilter-persistent save' && \
     printf "%s\n" "Firewall rules saved and enabled" || printf "%s\n" "Failed to enable saved and Firewall rules"
 };
 function get-ipv4-subnet(){
